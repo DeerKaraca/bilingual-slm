@@ -11,7 +11,7 @@ from slm.config import load_config
 from slm.data.loader import MixtureLoader
 from slm.eval.bpb import evaluate_bpb, token_byte_lengths
 from slm.tokenizer import train_tokenizer
-from slm.train import lr_at, parse_overrides, train
+from slm.train import lr_at, parse_overrides, train, use_compile
 
 CORPUS = ["İstanbul'da hava çok güzel.", "The weather is nice today."] * 20
 
@@ -42,26 +42,56 @@ def smoke_config(setup, out_dir):
     return load_config("configs/smoke.yaml", {**setup, "out_dir": str(out_dir)})
 
 
-def test_loader_mixture_and_resume(tmp_path):
-    # Turkish file holds only token 1, English only token 2, so each row reveals its language.
-    for lang, token in [("tr", 1), ("en", 2)]:
+@pytest.fixture
+def id_tokens(tmp_path):
+    """Token files whose values are their own positions, so a window identifies its language and offset."""
+    for lang, first in [("tr", 0), ("en", 1000)]:
         (tmp_path / lang).mkdir()
-        np.full(1000, token, dtype=np.uint16).tofile(tmp_path / lang / "train.bin")
-    loader = MixtureLoader(tmp_path, 0.3, batch_size=2000, seq_len=8, seed=0)
-    x, _ = loader.next_batch()
-    assert abs((x[:, 0] == 1).float().mean().item() - 0.3) < 0.05
-
-    state = loader.state_dict()
-    x1, y1 = loader.next_batch()
-    loader.load_state_dict(state)
-    x2, _ = loader.next_batch()
-    assert torch.equal(x1, x2)
-    assert torch.equal(x1[:, 1:], y1[:, :-1])  # targets are inputs shifted by one
+        np.arange(first, first + 1000, dtype=np.uint16).tofile(tmp_path / lang / "train.bin")
+    return tmp_path
 
 
-def test_loader_opens_only_needed_languages(setup):
-    assert set(MixtureLoader(setup["data"]["tokens_dir"], 0.0, 2, 8, 0).data) == {"en"}
-    assert set(MixtureLoader(setup["data"]["tokens_dir"], 1.0, 2, 8, 0).data) == {"tr"}
+def read_all(loader, n_batches):
+    return torch.cat([loader.next_batch()[0] for _ in range(n_batches)])
+
+
+def test_loader_exact_mixture_without_repetition(id_tokens):
+    loader = MixtureLoader(id_tokens, 0.3, batch_size=10, seq_len=8, seed=0, n_sequences=100)
+    x = read_all(loader, 10)
+    starts = x[:, 0]
+    assert (starts < 1000).sum() == 30  # exactly 30% Turkish
+    assert len(set(starts.tolist())) == 100  # no window is read twice
+    assert ((starts % 1000) % 8 == 0).all()  # windows are aligned, so they never overlap
+    assert torch.equal(x[:, 1:], x[:, :-1] + 1)  # each row is one contiguous window
+
+
+def test_loader_order_is_shared_across_mixtures(id_tokens):
+    tr_of = lambda f: [s for s in read_all(MixtureLoader(id_tokens, f, 10, 8, 0, 100), 10)[:, 0].tolist() if s < 1000]
+    assert tr_of(0.1) == tr_of(1.0)[:10]
+
+
+def test_loader_resume(id_tokens):
+    loader = MixtureLoader(id_tokens, 0.5, 4, 8, 0, 40)
+    read_all(loader, 3)
+    resumed = MixtureLoader(id_tokens, 0.5, 4, 8, 0, 40)
+    resumed.load_state_dict(loader.state_dict())
+    assert torch.equal(resumed.next_batch()[0], loader.next_batch()[0])
+
+
+def test_loader_checks_capacity_and_opens_only_needed_languages(id_tokens):
+    with pytest.raises(ValueError):
+        MixtureLoader(id_tokens, 1.0, 4, 8, 0, n_sequences=125)  # only 124 windows per language
+    assert set(MixtureLoader(id_tokens, 0.0, 4, 8, 0, 8).data) == {"en"}
+    assert set(MixtureLoader(id_tokens, 1.0, 4, 8, 0, 8).data) == {"tr"}
+
+
+def test_compile_disabled_on_old_gpus(monkeypatch):
+    assert use_compile(True, torch.device("cpu"))
+    assert not use_compile(False, torch.device("cpu"))
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda device: (6, 0))  # P100
+    assert not use_compile(True, torch.device("cuda"))
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda device: (7, 5))  # T4
+    assert use_compile(True, torch.device("cuda"))
 
 
 def test_bpb_of_uniform_model(tokenizer):

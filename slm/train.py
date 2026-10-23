@@ -43,6 +43,14 @@ def make_optimizer(model: GPT, cfg: Config, device: torch.device):
     return torch.optim.AdamW(groups, lr=cfg.train.lr, betas=cfg.train.betas, fused=device.type == "cuda")
 
 
+def use_compile(requested: bool, device: torch.device) -> bool:
+    """torch.compile generates Triton kernels, which need compute capability >= 7.0 (T4 yes, P100 no)."""
+    if requested and device.type == "cuda" and torch.cuda.get_device_capability(device) < (7, 0):
+        print("torch.compile disabled: GPU compute capability < 7.0")
+        return False
+    return requested
+
+
 def truncate_log(path: Path, step: int):
     """Drop rows logged after the checkpoint we resume from, so they are not duplicated."""
     with open(path) as f:
@@ -69,7 +77,10 @@ def train(cfg: Config, device: torch.device):
     model = GPT(cfg.model).to(device)
     optimizer = make_optimizer(model, cfg, device)
     scaler = torch.amp.GradScaler(device.type, enabled=cuda)
-    loader = MixtureLoader(cfg.data.tokens_dir, cfg.data.tr_fraction, t.micro_batch_size, cfg.model.context_len, t.seed)
+    n_sequences = cfg.total_steps * t.grad_accum_steps * t.micro_batch_size
+    loader = MixtureLoader(
+        cfg.data.tokens_dir, cfg.data.tr_fraction, t.micro_batch_size, cfg.model.context_len, t.seed, n_sequences
+    )
     val = {lang: load_tokens(cfg.data.tokens_dir, lang, "val") for lang in ("tr", "en")}
     byte_lengths = token_byte_lengths(Tokenizer.from_file(cfg.data.tokenizer))
     print(f"{cfg.name}: {model.num_params() / 1e6:.1f}M params "
@@ -98,7 +109,7 @@ def train(cfg: Config, device: torch.device):
         checkpoint.save(run_dir / name, {"model": model.state_dict(), "config": cfg.to_dict(), "step": step})
         save([name])
 
-    fwd = torch.compile(model) if t.compile else model
+    fwd = torch.compile(model) if use_compile(t.compile, device) else model
     snapshot_steps = {int(cfg.total_steps * s) for s in SNAPSHOTS}
     start_time = last_save = window_start = time.time()
     window_steps = 0
