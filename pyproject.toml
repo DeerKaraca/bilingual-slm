@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-data = ["datasets", "tokenizers", "huggingface_hub"]
+data = ["pyarrow", "tokenizers", "huggingface_hub"]
 train = ["huggingface_hub", "matplotlib"]
 server = ["fastapi", "uvicorn", "tokenizers"]
 dev = ["pytest"]

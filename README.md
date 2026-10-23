@@ -39,3 +39,10 @@ pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install -e ".[dev]"
 pytest
 ```
+
+## Known limitations
+
+- **Quality filters differ between languages.** English comes from FineWeb-Edu (an educational-value
+  classifier), Turkish from FineWeb2-HQ (an embedding-based quality classifier). Both are
+  "high-quality" subsets, but not filtered identically, so part of any cross-lingual effect may come
+  from differences in data quality rather than language alone.
