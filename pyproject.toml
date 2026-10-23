@@ -1,0 +1,26 @@
+[project]
+name = "bilingual-slm"
+version = "0.1.0"
+description = "Turkish-English small language model trained from scratch, plus a hand-written inference server."
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.1",
+    "numpy",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+data = ["datasets", "tokenizers", "huggingface_hub"]
+train = ["huggingface_hub", "matplotlib"]
+server = ["fastapi", "uvicorn", "tokenizers"]
+dev = ["pytest"]
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["slm*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

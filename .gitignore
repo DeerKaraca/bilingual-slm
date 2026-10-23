@@ -1,0 +1,10 @@
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+# Large artifacts live on Kaggle / HF Hub, not in git
+/data/
+/runs/
+*.pt
+*.bin
+*.safetensors

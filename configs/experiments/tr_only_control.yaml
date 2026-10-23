@@ -1,0 +1,7 @@
+# Turkish-only model that sees exactly as many Turkish tokens as tr030 (0.3 * 600M).
+# The gap between this run and tr030 on Turkish BPB = knowledge transferred from English.
+name: tr_only_control
+data:
+  tr_fraction: 1.0
+train:
+  total_tokens: 180_000_000

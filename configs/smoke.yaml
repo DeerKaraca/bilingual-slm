@@ -1,0 +1,17 @@
+# Tiny model for CPU tests and quick sanity runs.
+name: smoke
+model:
+  context_len: 128
+  n_layers: 2
+  d_model: 64
+  n_heads: 4
+  ffn_hidden: 192
+data:
+  tr_fraction: 0.5
+train:
+  total_tokens: 1_000_000
+  micro_batch_size: 4
+  grad_accum_steps: 2
+  warmup_steps: 10
+  eval_every: 20
+  eval_tokens: 20_000
