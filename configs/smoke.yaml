@@ -14,4 +14,4 @@ train:
   grad_accum_steps: 2
   warmup_steps: 10
   eval_every: 20
-  eval_tokens: 20_000
+  compile: false

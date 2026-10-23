@@ -24,7 +24,8 @@ class ModelConfig:
 @dataclass
 class DataConfig:
     tr_fraction: float = 0.5  # share of Turkish tokens in the training mix
-    shards_dir: str = "data/shards"
+    tokens_dir: str = "data/tokens"  # {lang}/{split}.bin from slm.data.tokenize
+    tokenizer: str = "assets/tokenizer.json"
 
 
 @dataclass
@@ -39,9 +40,9 @@ class TrainConfig:
     betas: tuple[float, float] = (0.9, 0.95)
     grad_clip: float = 1.0
     eval_every: int = 100  # optimizer steps
-    eval_tokens: int = 2_000_000  # per language
     checkpoint_every_minutes: float = 30.0
     seed: int = 0
+    compile: bool = True  # torch.compile; ~1 min warm-up, faster steps on GPU
 
 
 @dataclass
