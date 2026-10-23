@@ -11,7 +11,7 @@ import yaml
 
 @dataclass
 class ModelConfig:
-    vocab_size: int = 32_000
+    vocab_size: int = 32_768
     context_len: int = 1024
     n_layers: int = 8
     d_model: int = 512

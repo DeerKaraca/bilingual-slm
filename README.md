@@ -33,12 +33,21 @@ tests/          Unit tests (run on CPU)
 
 ## Development
 
+Developed on Linux (WSL2) with Python 3.13, matching Kaggle.
+
 ```bash
-python -m venv .venv
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-pip install -e ".[dev]"
-pytest
+uv venv
+uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+uv pip install -e ".[dev,data]"
+.venv/bin/python -m pytest
 ```
+
+## Pipeline
+
+| Step | Where | Command / notebook |
+|---|---|---|
+| 1. Stream + clean text | Kaggle CPU | `notebooks/01_prepare_data.ipynb` (`python -m slm.data.prepare`) |
+| 2. Tokenizer, fertility, token shards | Kaggle CPU | `notebooks/02_tokenize.ipynb` (`slm.tokenizer`, `slm.eval.fertility`, `slm.data.tokenize`) |
 
 ## Known limitations
 

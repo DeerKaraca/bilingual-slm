@@ -85,6 +85,16 @@ def write_shards(texts: Iterable[str], out_dir: Path, prefix: str, shard_bytes: 
     return {"docs": n_docs, "bytes": n_bytes, "shards": n_shards}
 
 
+def read_texts(lang_dir: Path, split: str) -> Iterator[str]:
+    """Read back the documents written by write_shards, in order."""
+    paths = sorted(lang_dir.glob(f"{split}-*.parquet"))
+    if not paths:
+        raise FileNotFoundError(f"no {split}-*.parquet files in {lang_dir}")
+    for path in paths:
+        for batch in pq.ParquetFile(path).iter_batches(columns=["text"]):
+            yield from batch.column("text").to_pylist()
+
+
 def prepare_language(lang: str, out_dir: Path, val_bytes: int, train_bytes: int, shard_bytes: int, seed: int):
     lang_dir = out_dir / lang
     lang_dir.mkdir(parents=True, exist_ok=True)
