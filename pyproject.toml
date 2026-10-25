@@ -13,7 +13,7 @@ dependencies = [
 data = ["pyarrow", "tokenizers", "huggingface_hub"]
 train = ["huggingface_hub", "matplotlib"]
 server = ["fastapi", "uvicorn", "tokenizers", "safetensors", "jinja2", "huggingface_hub"]
-dev = ["pytest", "httpx", "transformers"]  # transformers: reference for parity tests only
+dev = ["pytest", "httpx", "transformers", "matplotlib"]  # transformers: reference for parity tests only
 
 [build-system]
 requires = ["setuptools>=64"]

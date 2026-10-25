@@ -1,0 +1,128 @@
+{
+  "meta": {
+    "model": "HuggingFaceTB/SmolLM2-135M-Instruct",
+    "quant": "none",
+    "threads": 3,
+    "max_batch": 8,
+    "concurrency": [
+      1,
+      4,
+      8
+    ],
+    "requests": 16,
+    "output_lengths": [
+      16,
+      32,
+      64
+    ],
+    "rounds": 4,
+    "cpu": "AMD Ryzen 5 3500U with Radeon Vega Mobile Gfx"
+  },
+  "results": {
+    "latency|no_cache|16": {
+      "tokens_per_s": 1.7620953476971122,
+      "ttft_p50_s": 0.5266173654999875,
+      "itl_p50_ms": 570.9970553999785,
+      "latency_p50_s": 9.091573196499667,
+      "latency_p95_s": 9.091573196499667
+    },
+    "latency|no_cache|32": {
+      "tokens_per_s": 1.7856436407590701,
+      "ttft_p50_s": 0.4883605699999407,
+      "itl_p50_ms": 564.7505146612934,
+      "latency_p50_s": 17.99562652450004,
+      "latency_p95_s": 17.99562652450004
+    },
+    "latency|no_cache|64": {
+      "tokens_per_s": 1.549541242288146,
+      "ttft_p50_s": 0.47103892800032554,
+      "itl_p50_ms": 650.3441988095202,
+      "latency_p50_s": 41.4427234530001,
+      "latency_p95_s": 41.4427234530001
+    },
+    "latency|sequential|16": {
+      "tokens_per_s": 8.996171731790263,
+      "ttft_p50_s": 0.49875092049978775,
+      "itl_p50_ms": 85.33385383334462,
+      "latency_p50_s": 1.778758727999957,
+      "latency_p95_s": 1.778758727999957
+    },
+    "latency|sequential|32": {
+      "tokens_per_s": 10.41825453299164,
+      "ttft_p50_s": 0.453898532500034,
+      "itl_p50_ms": 84.86547745160203,
+      "latency_p50_s": 3.0714127414998984,
+      "latency_p95_s": 3.0714127414998984
+    },
+    "latency|sequential|64": {
+      "tokens_per_s": 11.305133516478232,
+      "ttft_p50_s": 0.44479853350003395,
+      "itl_p50_ms": 82.92757357936526,
+      "latency_p50_s": 5.661047728000085,
+      "latency_p95_s": 5.661047728000085
+    },
+    "throughput|sequential|1": {
+      "tokens_per_s": 10.117514444180127,
+      "ttft_p50_s": 0.797723604000339,
+      "itl_p50_ms": 85.43287936592088,
+      "latency_p50_s": 4.819808299499982,
+      "latency_p95_s": 11.850062258500202
+    },
+    "throughput|sequential|4": {
+      "tokens_per_s": 9.63103267065912,
+      "ttft_p50_s": 14.698821568749963,
+      "itl_p50_ms": 95.2840297854004,
+      "latency_p50_s": 18.31504538324998,
+      "latency_p95_s": 35.22915677200035
+    },
+    "throughput|sequential|8": {
+      "tokens_per_s": 9.62676654164359,
+      "ttft_p50_s": 36.848703647999855,
+      "itl_p50_ms": 89.96483688428052,
+      "latency_p50_s": 41.204808393250005,
+      "latency_p95_s": 53.06286188250033
+    },
+    "throughput|static|1": {
+      "tokens_per_s": 8.514681005184705,
+      "ttft_p50_s": 0.8553237745002207,
+      "itl_p50_ms": 98.02524389072343,
+      "latency_p50_s": 5.593308710749625,
+      "latency_p95_s": 14.185273026999766
+    },
+    "throughput|static|4": {
+      "tokens_per_s": 13.820072408280112,
+      "ttft_p50_s": 3.5020796967501155,
+      "itl_p50_ms": 194.42316198459162,
+      "latency_p50_s": 14.920991283500143,
+      "latency_p95_s": 22.765378219500235
+    },
+    "throughput|static|8": {
+      "tokens_per_s": 17.33069678562162,
+      "ttft_p50_s": 6.086362601749897,
+      "itl_p50_ms": 280.09415095381394,
+      "latency_p50_s": 19.981679510750382,
+      "latency_p95_s": 28.11898634650015
+    },
+    "throughput|continuous|1": {
+      "tokens_per_s": 9.009453627152965,
+      "ttft_p50_s": 0.840380530499715,
+      "itl_p50_ms": 93.13763127943915,
+      "latency_p50_s": 5.028088924249914,
+      "latency_p95_s": 14.075239184500333
+    },
+    "throughput|continuous|4": {
+      "tokens_per_s": 16.803434348140602,
+      "ttft_p50_s": 1.2986221389999173,
+      "itl_p50_ms": 188.84157405927323,
+      "latency_p50_s": 10.39347728749999,
+      "latency_p95_s": 28.229701377500078
+    },
+    "throughput|continuous|8": {
+      "tokens_per_s": 21.147957781819912,
+      "ttft_p50_s": 2.0870079857502333,
+      "itl_p50_ms": 260.1912283467148,
+      "latency_p50_s": 13.90326934625,
+      "latency_p95_s": 37.44434234600021
+    }
+  }
+}

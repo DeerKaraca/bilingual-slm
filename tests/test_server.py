@@ -70,6 +70,22 @@ def test_continuous_admits_while_static_waits(loaded):
     assert order == {"static": False, "continuous": True}
 
 
+def test_finished_slots_are_compacted(loaded):
+    """When the request in slot 0 finishes, the one in the highest slot moves down and keeps generating
+    the same text, so active requests stay in contiguous slots."""
+    params = [SamplingParams(max_tokens=n, temperature=0) for n in (2, 9, 9)]
+    expected = run(Engine(loaded, "sequential"), PROMPTS[:3], params)
+    engine = Engine(loaded, "continuous", max_batch=3)
+    outputs = {i: "" for i in range(3)}
+    for i, (prompt, p) in enumerate(zip(PROMPTS, params)):
+        engine.submit(Request(engine.tokenizer.encode(prompt).ids, p, lambda e, i=i: outputs.__setitem__(i, outputs[i] + e.text)))
+    slots_seen = []
+    while engine.step():
+        slots_seen.append(sorted(engine.active))
+    assert [0, 1] in slots_seen and [0, 2] not in slots_seen and [1, 2] not in slots_seen
+    assert [outputs[i] for i in range(3)] == [text for text, _ in expected]
+
+
 def test_stop_string_truncates(loaded):
     engine = Engine(loaded, "continuous")
     params = SamplingParams(max_tokens=30, seed=3)  # seeded sampling: varied text, same with or without stop
@@ -107,8 +123,9 @@ def test_cancel_frees_slot(loaded):
     engine.submit(req)
     engine.step()
     req.cancelled = True
+    before = len(events)
     engine.step()
-    assert not engine.active and len(events) <= 1
+    assert not engine.active and len(events) == before  # slot freed, nothing emitted after cancelling
 
 
 def test_rejects_too_long_prompt(loaded):

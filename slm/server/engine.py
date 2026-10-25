@@ -56,6 +56,9 @@ class Engine:
         weight = self.model.norm.weight  # float even in quantized models
         self.device = weight.device
         self.cache = None if mode == "no_cache" else KVCache(cfg, self.n_slots, self.max_len, self.device, weight.dtype)
+        if self.cache is not None:
+            mb = (self.cache.k.nbytes + self.cache.v.nbytes) / 2**20
+            log.info("KV cache: %d slots x %d tokens = %.0f MB", self.n_slots, self.max_len, mb)
         self.waiting: queue.Queue[Request] = queue.Queue()
         self.active: dict[int, Request] = {}  # slot -> request
         self._stopped = threading.Event()
@@ -129,7 +132,7 @@ class Engine:
         self._accept(req, logits[0, -1])
 
     def _decode(self):
-        reqs = list(self.active.values())
+        reqs = [self.active[s] for s in sorted(self.active)]  # slots 0..n-1, in order
         if self.cache is None:  # no_cache runs one request: recompute prompt + everything generated so far
             seq = reqs[0].prompt_ids + reqs[0].output_ids
             logits = self.model(torch.tensor([seq], device=self.device))[:, -1]
@@ -142,7 +145,7 @@ class Engine:
     def _accept(self, req: Request, logits: torch.Tensor):
         """Sample the next token of req, emit the new text and free the slot if the request is done."""
         if req.cancelled:
-            del self.active[req.slot]
+            self._release(req)
             return
         token = sample(logits, req.params, req.generator)
         req.output_ids.append(token)
@@ -157,7 +160,22 @@ class Engine:
         if text or reason:
             req.on_event(Event(text, reason, len(req.prompt_ids), len(req.output_ids)))
         if reason:
-            del self.active[req.slot]
+            self._release(req)
+
+    def _release(self, req: Request):
+        """Free req's slot and move the request in the highest slot into it. Active requests then
+        always sit in slots 0..n-1, so decoding reads the KV cache as a slice instead of a copy."""
+        del self.active[req.slot]
+        last = max(self.active, default=-1)
+        if self.cache is None or last < req.slot:
+            return
+        moved = self.active.pop(last)
+        n = int(self.cache.lengths[last])
+        self.cache.k[:, req.slot, :, :n] = self.cache.k[:, last, :, :n]
+        self.cache.v[:, req.slot, :, :n] = self.cache.v[:, last, :, :n]
+        self.cache.lengths[req.slot] = n
+        moved.slot = req.slot
+        self.active[req.slot] = moved
 
     def _new_text(self, req: Request, final: bool, drop_last: bool = False) -> tuple[str, bool]:
         """Text that can be emitted now, and whether a stop string was reached.

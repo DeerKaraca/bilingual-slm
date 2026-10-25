@@ -57,13 +57,18 @@ class KVCache:
         self.max_len = max_len
 
     def view(self, slots: list[int]) -> "CacheView":
-        return CacheView(self, torch.tensor(slots, device=self.k.device))
+        return CacheView(self, slots)
 
 
 class CacheView:
-    def __init__(self, cache: KVCache, slots: torch.Tensor):
+    def __init__(self, cache: KVCache, slots: list[int]):
         self.cache = cache
-        self.slots = slots
+        self.slots = torch.tensor(slots, device=cache.k.device)
+        # Reading the cache with an index list copies it on every layer and step; contiguous slots
+        # (the engine keeps active requests in 0..n-1) are read as a slice, which is a free view.
+        first = slots[0]
+        contiguous = slots == list(range(first, first + len(slots)))
+        self.read = slice(first, first + len(slots)) if contiguous else self.slots
 
     def prepare(self, T: int) -> torch.Tensor:
         """Return positions (B, T) of the new tokens and build the attention mask (B, 1, T, L).
@@ -86,7 +91,7 @@ class CacheView:
         rows = self.slots[:, None].expand_as(self.positions)
         self.cache.k[layer][rows, :, self.positions] = k.transpose(1, 2)
         self.cache.v[layer][rows, :, self.positions] = v.transpose(1, 2)
-        return self.cache.k[layer][self.slots, :, :self.length], self.cache.v[layer][self.slots, :, :self.length]
+        return self.cache.k[layer][self.read, :, :self.length], self.cache.v[layer][self.read, :, :self.length]
 
     def advance(self, T: int):
         self.cache.lengths[self.slots] += T

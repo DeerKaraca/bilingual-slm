@@ -13,6 +13,7 @@ services:
       - --mode=${MODE:-continuous}
       - --quant=${QUANT:-none}
       - --max-batch=${MAX_BATCH:-8}
+      - --max-len=${MAX_LEN:-2048}  # KV cache memory grows with max-batch x max-len (~755 MB at 8 x 2048)
       - --threads=${THREADS:-3}
     volumes:
       - hf-cache:/home/app/.cache/huggingface

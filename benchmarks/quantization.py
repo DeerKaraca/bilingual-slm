@@ -95,11 +95,12 @@ def main():
     windows = {lang: eval_windows(tok, args.text_dir, lang, args.eval_tokens, args.seq_len) for lang in args.langs}
 
     models = {v: quantize(copy.deepcopy(base), v) for v in VARIANTS}
-    # Laptop CPUs throttle as they heat up: measure in interleaved rounds and keep the median,
-    # so no variant is penalized for running last.
+    # Laptop CPUs throttle as they heat up: measure in interleaved rounds with a rotated order and
+    # keep the median, so no variant is favoured or penalized by always running first or last.
     timings = {v: {"prefill_256_ms": [], "decode_tok_s_b1": [], "decode_tok_s_b8": []} for v in VARIANTS}
-    for _ in range(args.rounds):
-        for v, model in models.items():
+    for rnd in range(args.rounds):
+        for v in VARIANTS[rnd % len(VARIANTS):] + VARIANTS[:rnd % len(VARIANTS)]:
+            model = models[v]
             timings[v]["prefill_256_ms"].append(time_prefill(model, 256) * 1000)
             for batch in (1, 8):
                 timings[v][f"decode_tok_s_b{batch}"].append(decode_throughput(model, batch))
@@ -129,7 +130,7 @@ def to_markdown(meta: dict) -> str:
     head = ["Variant", "Weights (MB)", "Prefill 256 tok (ms)", "Decode tok/s B=1", "Decode tok/s B=8"]
     head += [f"{lang.upper()} BPB" for lang in langs] + [f"{lang.upper()} top-1 agree" for lang in langs]
     lines = [f"# Quantization benchmark: {meta['model']}", "",
-             f"CPU, {meta['threads']} threads; speed = median of {meta['timing_rounds']} interleaved rounds; quality on {meta['eval_tokens_per_lang']:,} validation tokens per language "
+             f"CPU, {meta['threads']} threads; speed = median of {meta['timing_rounds']} rounds with a rotated variant order; quality on {meta['eval_tokens_per_lang']:,} validation tokens per language "
              f"in windows of {meta['seq_len']}. Top-1 agreement = share of positions where the next-token argmax "
              "matches float32.", "",
              "| " + " | ".join(head) + " |", "|" + "---|" * len(head)]

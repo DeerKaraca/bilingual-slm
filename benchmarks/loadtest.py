@@ -95,12 +95,15 @@ def median_of(runs: list[dict]) -> dict:
 
 
 def run_local(args) -> dict:
-    """Interleaved rounds: every round restarts each mode's server and runs its scenarios once."""
+    """Interleaved rounds: every round restarts each mode's server, in a rotated order, and runs its scenarios once."""
     latency_jobs = {n: [(SENTENCE * 2, n)] for n in args.output_lengths}
     throughput_jobs = make_jobs(args.requests)
     runs: dict[str, list[dict]] = {}
+    modes = ["no_cache", "sequential", "static", "continuous"]
     for rnd in range(args.rounds):
-        for mode in ("no_cache", "sequential", "static", "continuous"):
+        # Rotate the order every round: the CPU slows as it heats up, so a mode that always ran
+        # last would look slower than it is.
+        for mode in modes[rnd % len(modes):] + modes[:rnd % len(modes)]:
             with local_server(mode, args) as url:
                 if mode in ("no_cache", "sequential"):  # KV cache off vs on, one request at a time
                     for n, jobs in latency_jobs.items():
@@ -118,7 +121,7 @@ def to_markdown(meta: dict, results: dict) -> str:
         f"# Serving benchmark: {meta['model']}", "",
         f"CPU ({meta['cpu']}), server pinned to {meta['threads']} torch threads, client on the same machine; "
         f"quant={meta['quant']}, max batch {meta['max_batch']}. Greedy decoding with ignore_eos, so every request "
-        f"generates exactly max_tokens. Values are medians over {meta['rounds']} interleaved rounds.", "",
+        f"generates exactly max_tokens. Values are medians over {meta['rounds']} rounds with a rotated mode order.", "",
         "## KV cache: one request at a time", "",
         "| Output tokens | Inter-token latency, no cache (ms) | with KV cache (ms) | Request latency, no cache (s) | with KV cache (s) | Speed-up |",
         "|---|---|---|---|---|---|",
@@ -158,7 +161,7 @@ def main():
     p.add_argument("--concurrency", type=int, nargs="+", default=[1, 4, 8])
     p.add_argument("--requests", type=int, default=16)
     p.add_argument("--output-lengths", type=int, nargs="+", default=[16, 32, 64])
-    p.add_argument("--rounds", type=int, default=3)
+    p.add_argument("--rounds", type=int, default=4)  # one per position in the rotated mode order
     p.add_argument("--out", type=Path, default=Path("reports/serving"))
     args = p.parse_args()
 
