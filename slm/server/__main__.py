@@ -13,6 +13,7 @@ import uvicorn
 from slm.server.api import create_app
 from slm.server.engine import MODES, Engine
 from slm.server.loading import load_model
+from slm.server.quant import VARIANTS, quantize
 
 
 def main():
@@ -22,6 +23,7 @@ def main():
     p.add_argument("--mode", default="continuous", choices=MODES)
     p.add_argument("--max-batch", type=int, default=8)
     p.add_argument("--max-len", type=int, default=2048, help="max prompt + completion tokens per request")
+    p.add_argument("--quant", default="none", choices=VARIANTS, help="see slm/server/quant.py")
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--host", default="0.0.0.0")
     p.add_argument("--port", type=int, default=8000)
@@ -31,6 +33,7 @@ def main():
     device = torch.device(args.device)
     dtype = torch.float16 if device.type == "cuda" else torch.float32  # fp16 matmuls are slow on most CPUs
     loaded = load_model(args.model, args.tokenizer, args.max_len, device, dtype)
+    loaded.model = quantize(loaded.model, args.quant)
     engine = Engine(loaded, args.mode, args.max_batch, args.max_len)
     engine.start()
     try:

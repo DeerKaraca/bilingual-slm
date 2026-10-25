@@ -1,0 +1,64 @@
+{
+  "model": "HuggingFaceTB/SmolLM2-135M",
+  "threads": 4,
+  "eval_tokens_per_lang": 16384,
+  "seq_len": 512,
+  "timing_rounds": 5,
+  "rows": [
+    {
+      "variant": "none",
+      "weights_mb": 513.197283744812,
+      "prefill_256_ms": 1261.8058130001373,
+      "decode_tok_s_b1": 10.684922326595968,
+      "decode_tok_s_b8": 45.30676267029878,
+      "tr_bpb": 2.1533226987154115,
+      "tr_top1_agreement": 1.0,
+      "en_bpb": 0.9144460821465006,
+      "en_top1_agreement": 1.0
+    },
+    {
+      "variant": "int8",
+      "weights_mb": 210.07528972625732,
+      "prefill_256_ms": 1345.8866880000642,
+      "decode_tok_s_b1": 6.641893953379503,
+      "decode_tok_s_b8": 33.89693616379988,
+      "tr_bpb": 2.1564474833093223,
+      "tr_top1_agreement": 0.9521799683570862,
+      "en_bpb": 0.9160673102673256,
+      "en_top1_agreement": 0.9676789045333862
+    },
+    {
+      "variant": "int8-emb",
+      "weights_mb": 129.26297092437744,
+      "prefill_256_ms": 1422.4804979994587,
+      "decode_tok_s_b1": 6.070235744631641,
+      "decode_tok_s_b8": 31.976717188627536,
+      "tr_bpb": 2.15651465984994,
+      "tr_top1_agreement": 0.9476436376571655,
+      "en_bpb": 0.9165192029651277,
+      "en_top1_agreement": 0.9608114957809448
+    },
+    {
+      "variant": "dynamic",
+      "weights_mb": 209.53093242645264,
+      "prefill_256_ms": 1004.1784000004554,
+      "decode_tok_s_b1": 17.47472841637999,
+      "decode_tok_s_b8": 70.90638283620329,
+      "tr_bpb": 3.1793427757179566,
+      "tr_top1_agreement": 0.35962700843811035,
+      "en_bpb": 1.2270059030816776,
+      "en_top1_agreement": 0.5014491081237793
+    },
+    {
+      "variant": "dynamic-head",
+      "weights_mb": 236.53178119659424,
+      "prefill_256_ms": 946.3930679994519,
+      "decode_tok_s_b1": 21.524279927212593,
+      "decode_tok_s_b8": 105.80304617227299,
+      "tr_bpb": 3.255738606261287,
+      "tr_top1_agreement": 0.34104081988334656,
+      "en_bpb": 1.259462823439863,
+      "en_top1_agreement": 0.47574344277381897
+    }
+  ]
+}
