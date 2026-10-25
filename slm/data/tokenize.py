@@ -15,7 +15,7 @@ import numpy as np
 from tokenizers import Tokenizer
 
 from slm.data.prepare import read_texts
-from slm.tokenizer import EOT
+from slm.special_tokens import EOT
 
 
 def encode_split(tok: Tokenizer, lang_dir: Path, split: str, out_dir: Path) -> dict:

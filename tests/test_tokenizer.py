@@ -6,7 +6,8 @@ import pytest
 from slm.data.prepare import write_shards
 from slm.data.tokenize import encode_split
 from slm.eval.fertility import measure
-from slm.tokenizer import EOT, SPECIAL_TOKENS, new_tokenizer, train_tokenizer
+from slm.special_tokens import EOT, SPECIAL_TOKENS
+from slm.tokenizer import new_tokenizer, train_tokenizer
 
 CORPUS = [
     "İstanbul'da hava bugün çok güzel, 2024 yılında 15 kez yağmur yağdı.",

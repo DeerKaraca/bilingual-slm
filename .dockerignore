@@ -1,0 +1,12 @@
+.git
+.venv
+**/__pycache__
+.pytest_cache
+data
+runs
+reports
+notebooks
+tests
+benchmarks
+configs
+*.pt

@@ -11,7 +11,7 @@ from tokenizers import Tokenizer
 
 from slm.config import ModelConfig
 from slm.model import GPT
-from slm.tokenizer import EOT
+from slm.special_tokens import EOT
 
 HF_FILES = ["config.json", "model.safetensors", "tokenizer.json", "tokenizer_config.json", "generation_config.json"]
 

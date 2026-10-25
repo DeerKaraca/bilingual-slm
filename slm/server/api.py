@@ -25,10 +25,11 @@ class GenerationFields(BaseModel):
     stop: str | list[str] | None = None
     stream: bool = False
     seed: int | None = None
+    ignore_eos: bool = False  # vLLM-style extension, used by the load test
 
     def sampling(self) -> SamplingParams:
         stop = [self.stop] if isinstance(self.stop, str) else self.stop or []
-        return SamplingParams(self.max_tokens, self.temperature, self.top_p, self.top_k, stop, self.seed)
+        return SamplingParams(self.max_tokens, self.temperature, self.top_p, self.top_k, stop, self.seed, self.ignore_eos)
 
 
 class CompletionRequest(GenerationFields):

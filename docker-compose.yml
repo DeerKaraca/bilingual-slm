@@ -1,0 +1,27 @@
+# docker compose up --build            SmolLM2-135M-Instruct on http://localhost:8000
+# QUANT=int8-emb docker compose up     override any setting below from the environment
+# Own checkpoint:
+#   docker compose run --service-ports server --model /app/runs/tr030/final.pt --tokenizer /app/runs/tokenizer.json
+services:
+  server:
+    build: .
+    image: bilingual-slm-server
+    ports:
+      - "8000:8000"
+    command:
+      - --model=${MODEL:-HuggingFaceTB/SmolLM2-135M-Instruct}
+      - --mode=${MODE:-continuous}
+      - --quant=${QUANT:-none}
+      - --max-batch=${MAX_BATCH:-8}
+      - --threads=${THREADS:-3}
+    volumes:
+      - hf-cache:/home/app/.cache/huggingface
+      - ./runs:/app/runs:ro
+    mem_limit: 2g  # WSL has 4 GB; keep the container from starving it
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      start_period: 120s
+
+volumes:
+  hf-cache:

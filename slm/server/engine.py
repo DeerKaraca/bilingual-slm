@@ -146,25 +146,27 @@ class Engine:
             return
         token = sample(logits, req.params, req.generator)
         req.output_ids.append(token)
+        is_eos = token in self.eos_ids and not req.params.ignore_eos
         reason = None
-        if token in self.eos_ids:
+        if is_eos:
             reason = "stop"
         elif len(req.output_ids) >= req.params.max_tokens or len(req.prompt_ids) + len(req.output_ids) >= self.max_len:
             reason = "length"
-        text, hit_stop = self._new_text(req, final=reason is not None)
+        text, hit_stop = self._new_text(req, final=reason is not None, drop_last=is_eos)
         reason = "stop" if hit_stop else reason
         if text or reason:
             req.on_event(Event(text, reason, len(req.prompt_ids), len(req.output_ids)))
         if reason:
             del self.active[req.slot]
 
-    def _new_text(self, req: Request, final: bool) -> tuple[str, bool]:
+    def _new_text(self, req: Request, final: bool, drop_last: bool = False) -> tuple[str, bool]:
         """Text that can be emitted now, and whether a stop string was reached.
 
         Byte-level BPE can split one character over several tokens, so a trailing incomplete
         character ("�") is held back, as is a tail that could still grow into a stop string.
         """
-        text = self.tokenizer.decode(req.output_ids)
+        # The EOS token is counted in usage but its text is never emitted.
+        text = self.tokenizer.decode(req.output_ids[:-1] if drop_last else req.output_ids)
         hits = [i for i in (text.find(s) for s in req.params.stop) if i >= 0]
         if hits:
             text = text[:min(hits)]

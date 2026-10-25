@@ -11,6 +11,7 @@ class SamplingParams:
     top_k: int = 0  # 0 = disabled
     stop: list[str] = field(default_factory=list)
     seed: int | None = None
+    ignore_eos: bool = False  # benchmarking: always generate max_tokens
 
 
 def sample(logits: torch.Tensor, params: SamplingParams, generator: torch.Generator) -> int:

@@ -10,7 +10,8 @@ from slm.server.api import create_app
 from slm.server.engine import MODES, Engine, Request
 from slm.server.loading import LoadedModel
 from slm.server.sampling import SamplingParams
-from slm.tokenizer import EOT, train_tokenizer
+from slm.special_tokens import EOT
+from slm.tokenizer import train_tokenizer
 
 CORPUS = ["İstanbul'da hava çok güzel.", "The weather is nice today.", "Merhaba dünya, hello world!"] * 20
 CHATML = ("{% for m in messages %}<|im_start|>{{ m.role }}\n{{ m.content }}<|im_end|>\n{% endfor %}"
@@ -78,6 +79,19 @@ def test_stop_string_truncates(loaded):
     params.stop = [full[k:k + 2]]
     [(text, finish)] = run(engine, ["hello"], [params])
     assert finish == "stop" and text == full[:k]
+
+
+def test_eos_stops_unless_ignored(loaded):
+    greedy = SamplingParams(max_tokens=6, temperature=0)
+    engine = Engine(loaded, "continuous")
+    probe = Request(engine.tokenizer.encode("hello").ids, greedy, lambda e: None)
+    engine.submit(probe)
+    while engine.step():
+        pass
+    engine.eos_ids = {probe.output_ids[0]}  # pretend the first generated token is EOS
+    assert run(engine, ["hello"], [greedy]) == [("", "stop")]
+    greedy.ignore_eos = True
+    assert run(engine, ["hello"], [greedy])[0][1] == "length"
 
 
 def test_seeded_sampling_is_reproducible(loaded):

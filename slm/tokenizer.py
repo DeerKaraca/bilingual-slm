@@ -10,9 +10,8 @@ from pathlib import Path
 from tokenizers import Regex, Tokenizer, decoders, models, pre_tokenizers, trainers
 
 from slm.data.prepare import MB, read_texts, take_bytes
+from slm.special_tokens import SPECIAL_TOKENS
 
-EOT = "<|endoftext|>"  # document separator
-SPECIAL_TOKENS = [EOT, "<|im_start|>", "<|im_end|>"]  # chat tokens reserved for later
 
 # Letter runs keep their leading space; digits are split one by one; punctuation is grouped.
 # Unlike GPT-2's pattern there are no English contraction rules ('s, 'd, ...), which would
