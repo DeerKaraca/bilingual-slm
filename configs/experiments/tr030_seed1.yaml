@@ -1,0 +1,6 @@
+# Replicate of tr030 with another seed (different init and data order) to estimate run-to-run noise.
+name: tr030_seed1
+data:
+  tr_fraction: 0.3
+train:
+  seed: 1
