@@ -38,7 +38,7 @@ Developed on Linux (WSL2) with Python 3.13, matching Kaggle.
 ```bash
 uv venv
 uv pip install torch --index-url https://download.pytorch.org/whl/cpu
-uv pip install -e ".[dev,data]"
+uv pip install -e ".[dev,data,server]"
 .venv/bin/python -m pytest
 ```
 
@@ -49,6 +49,26 @@ uv pip install -e ".[dev,data]"
 | 1. Stream + clean text | Kaggle CPU | `notebooks/01_prepare_data.ipynb` (`python -m slm.data.prepare`) |
 | 2. Tokenizer, fertility, token shards | Kaggle CPU | `notebooks/02_tokenize.ipynb` (`slm.tokenizer`, `slm.eval.fertility`, `slm.data.tokenize`) |
 | 3. Train (two runs per session, auto-resume) | Kaggle T4 x2 | `notebooks/03_train.ipynb` (`python -m slm.train --config configs/experiments/<run>.yaml`) |
+
+## Inference server
+
+Written from scratch on PyTorch + FastAPI (no vLLM / TGI). It serves our checkpoints and any
+Llama-architecture HF model; development uses [SmolLM2-135M](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct),
+whose layout (RMSNorm, RoPE, SwiGLU, tied embeddings) matches ours plus grouped-query attention.
+
+```bash
+python -m slm.server --model HuggingFaceTB/SmolLM2-135M-Instruct   # or: --model runs/tr030/final.pt --tokenizer assets/tokenizer.json
+curl localhost:8000/v1/chat/completions -H "Content-Type: application/json"   -d '{"messages": [{"role": "user", "content": "What is the capital of France?"}], "stream": true}'
+```
+
+- **Engine:** one thread owns the model and a preallocated slot-based KV cache; every step decodes one token for all
+  active requests, each at its own position. Attention is cut at the longest active sequence, not at the cache size.
+- **Modes** (`--mode`): `no_cache`, `sequential`, `static` batching, `continuous` batching (default).
+- **API:** `/v1/completions`, `/v1/chat/completions` (ChatML via the model's own chat template; models without
+  instruction tuning get a clear 400), `/v1/models`, `/health`. SSE streaming, `temperature`, `top_p`, `top_k`,
+  `stop`, `seed`. Disconnected clients free their slot immediately.
+- **Correctness:** `benchmarks/parity.py` loads SmolLM2-135M into our model and compares with `transformers`:
+  max logit difference 5e-5, identical greedy output.
 
 ## Known limitations
 

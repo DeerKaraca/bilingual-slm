@@ -9,5 +9,5 @@ jobs:
         with:
           python-version: "3.13"
       - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
-      - run: pip install -e ".[dev,data]"
+      - run: pip install -e ".[dev,data,server]"
       - run: pytest -q

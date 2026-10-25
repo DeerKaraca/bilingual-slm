@@ -17,8 +17,18 @@ class ModelConfig:
     d_model: int = 512
     n_heads: int = 8
     ffn_hidden: int = 1408  # ~8/3 * d_model (SwiGLU keeps params close to a 4x MLP), rounded to 64
+    n_kv_heads: int | None = None  # None = n_heads; fewer = grouped-query attention (e.g. SmolLM2)
     rope_theta: float = 10_000.0
+    norm_eps: float = 1e-6
     tie_embeddings: bool = True
+
+    @property
+    def head_dim(self) -> int:
+        return self.d_model // self.n_heads
+
+    @property
+    def kv_heads(self) -> int:
+        return self.n_kv_heads or self.n_heads
 
 
 @dataclass
@@ -88,6 +98,6 @@ def load_config(path: str | Path, overrides: dict | None = None) -> Config:
     _update(cfg, overrides or {})
     if not 0.0 <= cfg.data.tr_fraction <= 1.0:
         raise ValueError("data.tr_fraction must be in [0, 1]")
-    if cfg.model.d_model % cfg.model.n_heads:
-        raise ValueError("model.d_model must be divisible by model.n_heads")
+    if cfg.model.d_model % cfg.model.n_heads or cfg.model.n_heads % cfg.model.kv_heads:
+        raise ValueError("model.d_model must be divisible by n_heads, and n_heads by n_kv_heads")
     return cfg
