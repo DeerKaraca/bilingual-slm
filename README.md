@@ -94,6 +94,11 @@ curl localhost:8000/v1/chat/completions -H "Content-Type: application/json"   -d
   Inputs to `mlp.down` have outliers up to 40,000x the median magnitude, so most values round to zero; keeping only
   `mlp.down` in float recovers most of the quality (EN BPB 1.23 -> 1.02). The scale is shared across the batch, so
   output quality even depends on which requests are batched together (BPB 1.21 at batch 1 vs 1.27 at batch 4).
+  This is the known activation-outlier problem of LLM quantization: [LLM.int8()](https://arxiv.org/abs/2208.07339)
+  (Dettmers et al., 2022) keeps the few outlier feature dimensions in 16-bit and the rest in int8, and
+  [SmoothQuant](https://arxiv.org/abs/2211.10438) (Xiao et al., 2023) rescales channels to move the outliers from
+  activations into the weights, which tolerate quantization better. Weight-only int8 sidesteps it by not touching
+  activations at all.
 - Quantizing `lm_head` with `quantize_dynamic` *grows* the weights: it gets its own int8 copy and the tie with
   the fp32 embedding is lost. Our `Int8Embedding` shares the int8 table instead.
 
