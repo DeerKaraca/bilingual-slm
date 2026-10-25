@@ -172,14 +172,15 @@ class GPT(nn.Module):
         """
         T = idx.shape[1]
         if cache is None:
-            positions = torch.arange(T, device=idx.device)
+            if T > self.cfg.context_len:
+                raise ValueError(f"sequence exceeds context_len {self.cfg.context_len}")
+            cos, sin = self.rope_cos[:T], self.rope_sin[:T]
         else:
             positions = cache.prepare(T)
-        if T > self.cfg.context_len or (cache is not None and cache.length > self.cfg.context_len):
-            raise ValueError(f"sequence exceeds context_len {self.cfg.context_len}")
-        cos, sin = self.rope_cos[positions], self.rope_sin[positions]
-        if cos.dim() == 3:  # per-row positions: (B, T, Dh/2) -> broadcast over heads
-            cos, sin = cos.unsqueeze(1), sin.unsqueeze(1)
+            if cache.length > self.cfg.context_len:
+                raise ValueError(f"sequence exceeds context_len {self.cfg.context_len}")
+            # Per-row positions: (B, T, Dh/2) -> (B, 1, T, Dh/2) to broadcast over heads.
+            cos, sin = self.rope_cos[positions].unsqueeze(1), self.rope_sin[positions].unsqueeze(1)
         x = self.embed(idx)
         for i, block in enumerate(self.blocks):
             x = block(x, cos, sin, cache, i)
