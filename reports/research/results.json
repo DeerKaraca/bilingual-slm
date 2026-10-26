@@ -1,0 +1,131 @@
+{
+  "complete": [
+    "tr000",
+    "tr010",
+    "tr030",
+    "tr030_seed1",
+    "tr050",
+    "tr100",
+    "tr_only_control"
+  ],
+  "final": {
+    "tr000": {
+      "tr_share": 0.0,
+      "tr_tokens": 0.0,
+      "en_tokens": 599785472.0,
+      "tr_bpb": 2.7328,
+      "en_bpb": 1.1184
+    },
+    "tr010": {
+      "tr_share": 0.1,
+      "tr_tokens": 59978547.2,
+      "en_tokens": 539806924.8000001,
+      "tr_bpb": 1.3159,
+      "en_bpb": 1.1252
+    },
+    "tr030": {
+      "tr_share": 0.3,
+      "tr_tokens": 179935641.6,
+      "en_tokens": 419849830.4,
+      "tr_bpb": 1.2158,
+      "en_bpb": 1.1465
+    },
+    "tr050": {
+      "tr_share": 0.5,
+      "tr_tokens": 299892736.0,
+      "en_tokens": 299892736.0,
+      "tr_bpb": 1.1768,
+      "en_bpb": 1.1793
+    },
+    "tr100": {
+      "tr_share": 1.0,
+      "tr_tokens": 599785472.0,
+      "en_tokens": 0.0,
+      "tr_bpb": 1.12,
+      "en_bpb": 1.7456
+    },
+    "tr_only_control": {
+      "tr_share": 1.0,
+      "tr_tokens": 179830784.0,
+      "en_tokens": 0.0,
+      "tr_bpb": 1.278,
+      "en_bpb": 1.9698
+    },
+    "tr030_seed1": {
+      "tr_share": 0.3,
+      "tr_tokens": 179935641.6,
+      "en_tokens": 419849830.4,
+      "tr_bpb": 1.217,
+      "en_bpb": 1.1472
+    }
+  },
+  "noise": {
+    "tr": 0.0012000000000000899,
+    "en": 0.0006999999999999229
+  },
+  "tr030_mean": {
+    "tr": 1.2164000000000001,
+    "en": 1.1468500000000001
+  },
+  "transfer": {
+    "bpb": 0.06159999999999988,
+    "relative_to_control": 0.048200312989045285,
+    "verdict": "English helps Turkish (positive transfer)"
+  },
+  "interference": [
+    {
+      "run": "tr010",
+      "lang": "tr",
+      "tokens": 59978547.2,
+      "final_bpb": 1.3159,
+      "monolingual_curve_bpb": 1.6289544,
+      "gap": -0.31305439999999995,
+      "verdict": "below the monolingual curve (curve not schedule-matched)"
+    },
+    {
+      "run": "tr030",
+      "lang": "tr",
+      "tokens": 179935641.6,
+      "final_bpb": 1.2158,
+      "monolingual_curve_bpb": 1.2618488,
+      "gap": -0.04604880000000011,
+      "verdict": "below the monolingual curve (curve not schedule-matched)"
+    },
+    {
+      "run": "tr050",
+      "lang": "tr",
+      "tokens": 299892736.0,
+      "final_bpb": 1.1768,
+      "monolingual_curve_bpb": 1.187072,
+      "gap": -0.010271999999999837,
+      "verdict": "below the monolingual curve (curve not schedule-matched)"
+    },
+    {
+      "run": "tr010",
+      "lang": "en",
+      "tokens": 539806924.8000001,
+      "final_bpb": 1.1252,
+      "monolingual_curve_bpb": 1.123724,
+      "gap": 0.0014760000000000328,
+      "verdict": "interference likely"
+    },
+    {
+      "run": "tr030",
+      "lang": "en",
+      "tokens": 419849830.4,
+      "final_bpb": 1.1465,
+      "monolingual_curve_bpb": 1.1466944000000001,
+      "gap": -0.00019440000000003899,
+      "verdict": "inconclusive at this noise level"
+    },
+    {
+      "run": "tr050",
+      "lang": "en",
+      "tokens": 299892736.0,
+      "final_bpb": 1.1793,
+      "monolingual_curve_bpb": 1.18864,
+      "gap": -0.009339999999999904,
+      "verdict": "below the monolingual curve (curve not schedule-matched)"
+    }
+  ]
+}
