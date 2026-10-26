@@ -1,3 +1,4 @@
+# mkdir -p runs                       first: otherwise Docker creates ./runs (mounted below) owned by root
 # docker compose up --build            SmolLM2-135M-Instruct on http://localhost:8000
 # QUANT=int8-emb docker compose up     override any setting below from the environment
 # Own checkpoint:
