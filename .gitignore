@@ -8,3 +8,5 @@ __pycache__/
 *.pt
 *.bin
 *.safetensors
+# Server logs written by the load test (diagnostics, not results)
+reports/logs/

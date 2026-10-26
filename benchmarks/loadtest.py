@@ -5,12 +5,14 @@
 
 Every request streams with temperature 0 and ignore_eos, so it generates exactly max_tokens.
 Server and client share one laptop CPU whose speed drifts as it heats up, so configurations are
-measured in interleaved rounds and the median over rounds is reported.
+measured in rounds with a rotated mode order. Throughput is the median over rounds; latency
+percentiles pool the requests of all rounds. Server logs go to reports/logs/.
 """
 
 import argparse
 import asyncio
 import json
+import math
 import random
 import statistics
 import subprocess
@@ -45,22 +47,35 @@ async def one_request(client: httpx.AsyncClient, url: str, prompt: str, max_toke
 
 async def closed_loop(url: str, concurrency: int, jobs: list[tuple[str, int]]) -> dict:
     """`concurrency` clients send the jobs back to back (each waits for its previous response)."""
-    pending, results = list(jobs), []
+    pending, requests = list(jobs), []
     async with httpx.AsyncClient(timeout=None) as client:
         async def client_loop():
             while pending:
-                results.append(await one_request(client, url, *pending.pop(0)))
+                requests.append(await one_request(client, url, *pending.pop(0)))
 
         start = time.perf_counter()
         await asyncio.gather(*(client_loop() for _ in range(concurrency)))
         wall = time.perf_counter() - start
-    latencies = sorted(r["latency"] for r in results)
+    return {"wall": wall, "requests": requests}
+
+
+def percentile(values: list[float], q: float) -> float:
+    """Nearest-rank percentile."""
+    ordered = sorted(values)
+    return ordered[max(math.ceil(q * len(ordered)) - 1, 0)]
+
+
+def summarize(runs: list[dict]) -> dict:
+    """Throughput: median over runs. Latencies: percentiles over the requests of all runs pooled,
+    so p95 rests on rounds x requests samples instead of one run's few."""
+    pooled = [r for run in runs for r in run["requests"]]
     return {
-        "tokens_per_s": sum(r["tokens"] for r in results) / wall,
-        "ttft_p50_s": statistics.median(r["ttft"] for r in results),
-        "itl_p50_ms": statistics.median(r["itl"] for r in results) * 1000,
-        "latency_p50_s": statistics.median(latencies),
-        "latency_p95_s": latencies[min(len(latencies) - 1, round(0.95 * (len(latencies) - 1)))],
+        "tokens_per_s": statistics.median(sum(r["tokens"] for r in run["requests"]) / run["wall"] for run in runs),
+        "ttft_p50_s": percentile([r["ttft"] for r in pooled], 0.5),
+        "itl_p50_ms": percentile([r["itl"] for r in pooled], 0.5) * 1000,
+        "latency_p50_s": percentile([r["latency"] for r in pooled], 0.5),
+        "latency_p95_s": percentile([r["latency"] for r in pooled], 0.95),
+        "n_requests": len(pooled),
     }
 
 
@@ -68,30 +83,34 @@ async def closed_loop(url: str, concurrency: int, jobs: list[tuple[str, int]]) -
 def local_server(mode: str, args):
     cmd = [sys.executable, "-m", "slm.server", "--model", args.model, "--mode", mode, "--threads", str(args.threads),
            "--max-batch", str(args.max_batch), "--quant", args.quant, "--port", str(args.port)]
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    args.log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = args.log_dir / f"server_{mode}.log"
+    log = open(log_path, "a")
+    log.write(f"\n=== {time.strftime('%Y-%m-%d %H:%M:%S')} {' '.join(cmd)}\n")
+    log.flush()
+    proc = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT)
     url = f"http://127.0.0.1:{args.port}"
     try:
         deadline = time.time() + 300
         while True:
             if proc.poll() is not None:
-                raise RuntimeError(f"server exited with code {proc.returncode}: {' '.join(cmd)}")
+                raise RuntimeError(f"server exited with code {proc.returncode}, see {log_path}")
             try:
                 if httpx.get(f"{url}/health").status_code == 200:
                     break
             except httpx.TransportError:
                 pass
             if time.time() > deadline:
-                raise TimeoutError("server did not start")
+                raise TimeoutError(f"server did not start, see {log_path}")
             time.sleep(1)
-        asyncio.run(closed_loop(url, 1, [("warm up", 4)]))  # first calls pay one-off allocation costs
+        # First calls pay one-off costs (allocations, kernel selection) per batch size: warm up with a
+        # full batch so the batched decode path is warm too.
+        asyncio.run(closed_loop(url, args.max_batch, [("warm up", 8)] * args.max_batch))
         yield url
     finally:
         proc.terminate()
         proc.wait()
-
-
-def median_of(runs: list[dict]) -> dict:
-    return {k: statistics.median(r[k] for r in runs) for k in runs[0]}
+        log.close()
 
 
 def run_local(args) -> dict:
@@ -113,7 +132,7 @@ def run_local(args) -> dict:
                         runs.setdefault(f"throughput|{mode}|{c}", []).append(
                             asyncio.run(closed_loop(url, c, throughput_jobs)))
             print(f"round {rnd + 1}/{args.rounds} {mode} done", flush=True)
-    return {key: median_of(r) for key, r in runs.items()}
+    return {key: summarize(r) for key, r in runs.items()}
 
 
 def to_markdown(meta: dict, results: dict) -> str:
@@ -121,7 +140,8 @@ def to_markdown(meta: dict, results: dict) -> str:
         f"# Serving benchmark: {meta['model']}", "",
         f"CPU ({meta['cpu']}), server pinned to {meta['threads']} torch threads, client on the same machine; "
         f"quant={meta['quant']}, max batch {meta['max_batch']}. Greedy decoding with ignore_eos, so every request "
-        f"generates exactly max_tokens. Values are medians over {meta['rounds']} rounds with a rotated mode order.", "",
+        f"generates exactly max_tokens. {meta['rounds']} rounds with a rotated mode order: throughput is the median "
+        f"over rounds, latencies pool the requests of all rounds.", "",
         "## KV cache: one request at a time", "",
         "| Output tokens | Inter-token latency, no cache (ms) | with KV cache (ms) | Request latency, no cache (s) | with KV cache (s) | Speed-up |",
         "|---|---|---|---|---|---|",
@@ -132,6 +152,8 @@ def to_markdown(meta: dict, results: dict) -> str:
                      f"{on['latency_p50_s']:.1f} | {off['latency_p50_s'] / on['latency_p50_s']:.1f}x |")
     lines += [
         "", f"## Batching: {meta['requests']} requests with mixed prompt and output lengths", "",
+        f"Latency p95 is a nearest-rank estimate from {meta['requests'] * meta['rounds']} requests per row "
+        f"({meta['requests']} per round x {meta['rounds']} rounds), so it is approximate.", "",
         "| Mode | Concurrent clients | Throughput (tok/s) | TTFT p50 (s) | Inter-token p50 (ms) | Latency p50 (s) | Latency p95 (s) |",
         "|---|---|---|---|---|---|---|",
     ]
@@ -160,14 +182,16 @@ def main():
     p.add_argument("--port", type=int, default=8100)
     p.add_argument("--concurrency", type=int, nargs="+", default=[1, 4, 8])
     p.add_argument("--requests", type=int, default=16)
-    p.add_argument("--output-lengths", type=int, nargs="+", default=[16, 32, 64])
+    p.add_argument("--output-lengths", type=int, nargs="+", default=[16, 32, 64, 128])
     p.add_argument("--rounds", type=int, default=4)  # one per position in the rotated mode order
     p.add_argument("--out", type=Path, default=Path("reports/serving"))
+    p.add_argument("--log-dir", type=Path, default=Path("reports/logs"), help="server stdout/stderr")
     args = p.parse_args()
 
     if args.url:
         for c in args.concurrency:
-            print(json.dumps({"concurrency": c, **asyncio.run(closed_loop(args.url, c, make_jobs(args.requests)))}))
+            run = asyncio.run(closed_loop(args.url, c, make_jobs(args.requests)))
+            print(json.dumps({"concurrency": c, **summarize([run])}))
         return
 
     meta = {k: getattr(args, k) for k in ("model", "quant", "threads", "max_batch", "concurrency", "requests",

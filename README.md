@@ -67,38 +67,46 @@ curl localhost:8000/v1/chat/completions -H "Content-Type: application/json"   -d
 - **API:** `/v1/completions`, `/v1/chat/completions` (ChatML via the model's own chat template; models without
   instruction tuning get a clear 400), `/v1/models`, `/health`. SSE streaming, `temperature`, `top_p`, `top_k`,
   `stop`, `seed`. Disconnected clients free their slot immediately.
-- **Correctness:** `benchmarks/parity.py` loads SmolLM2-135M into our model and compares with `transformers`:
-  max logit difference 5e-5, identical greedy output.
+- **Correctness:** `benchmarks/parity.py` loads SmolLM2-135M-Instruct into our model and compares it with
+  `transformers` in float32: max logit difference 5.4e-5 for one forward pass. It then decodes four prompts of
+  different lengths through the engine at once (KV cache, continuous batching, two requests finishing early so slots
+  are compacted, one joining mid-flight) against a full-recompute greedy loop in `transformers`: all 76 tokens
+  identical, max logit difference 7.5e-5 over every decode step.
 
 ### Serving benchmark (CPU, SmolLM2-135M-Instruct)
 
 `benchmarks/loadtest.py` is an async client (httpx + SSE) that starts the server in each mode and measures
 time to first token, inter-token latency and throughput. Server pinned to 3 torch threads on a 4-core Ryzen 5 3500U,
 leaving one core for the client; greedy decoding with `ignore_eos` so every request generates exactly its
-`max_tokens`; medians over 4 rounds with the mode order rotated each round. Full tables:
-[reports/serving.md](reports/serving.md).
+`max_tokens`; each server is warmed up with a full batch. 4 rounds with the mode order rotated each round:
+throughput is the median over rounds, latency percentiles pool all rounds (p95 from 64 requests, so approximate).
+Full tables: [reports/serving.md](reports/serving.md).
 
 <p><img src="reports/serving_kv_cache.png" width="49%"> <img src="reports/serving_throughput.png" width="49%"></p>
 
 | 8 concurrent clients, 16 mixed requests | Throughput | Time to first token (p50) | Latency p50 / p95 |
 |---|---|---|---|
-| sequential (one request at a time) | 9.6 tok/s | 36.9 s | 41.2 s / 53.1 s |
-| static batching | 17.3 tok/s | 6.1 s | 20.0 s / 28.1 s |
-| **continuous batching** | **21.1 tok/s** | **2.1 s** | **13.9 s** / 37.4 s |
+| sequential (one request at a time) | 9.8 tok/s | 33.2 s | 38.9 s / 70.7 s |
+| static batching | 15.3 tok/s | 7.0 s | 20.7 s / 33.1 s |
+| **continuous batching** | **21.5 tok/s** | **2.2 s** | **15.5 s** / 45.8 s |
 
-- **KV cache:** 5.1x faster at 16 output tokens, 7.3x at 64; without it every token recomputes the whole sequence.
-- **Continuous batching** gives 2.2x the throughput of sequential serving and the first token 18x sooner. Against
-  static batching the main gain is waiting time: new requests take a free slot at the next step instead of waiting
-  for the whole batch. The price is a heavier tail (p95), because the batch never drains and long requests keep
-  sharing steps with newcomers.
-- **Two things the benchmark caught:** (1) the decode step spent 43% of its time gathering KV-cache rows with an
-  index list (a copy per layer per step); the engine now keeps active requests in slots `0..n-1` and reads the
-  cache as a slice, which halved the CPU time of a batch-8 step. (2) With a fixed mode order the mode that always
-  ran last looked ~18% slower at concurrency 1, where the code paths are identical: the laptop CPU throttles as it
-  heats up. Rotating the order removed the gap.
-- **Docker:** `docker compose up --build` (CPU image, 1.5 GB, mostly PyTorch). Weights are downloaded on first
-  start into a cache volume. Peak memory under load 1.76 GB, of which ~755 MB is the preallocated KV cache
-  (8 slots x 2048 tokens); `MAX_LEN=1024` halves it.
+- **KV cache:** 4.8x faster at 16 output tokens and 9.1x at 128. With the cache the inter-token latency stays at
+  ~73 ms; without it every token recomputes the whole sequence, so it grows from 456 to 687 ms.
+- **Continuous batching** gives 2.2x the throughput of sequential serving and the first token 15x sooner. Against
+  static batching it gains 40% throughput and 3x faster first tokens: new requests take a free slot at the next step
+  instead of waiting for the whole batch. The price is a heavier tail (p95), because the batch never drains and long
+  requests keep sharing steps with newcomers.
+- **Found by benchmarking:** the decode step spent 43% of its time gathering KV-cache rows with an index list (a copy
+  per layer per step). The engine now keeps active requests in slots `0..n-1` and reads the cache as a slice, which
+  halved the CPU time of a batch-8 step.
+- **Noise level:** at one client the three modes run identical code, yet the long benchmark shows them up to ~25%
+  apart (7.8-9.9 tok/s). A short back-to-back check of the same workload gives all three the same 73 ms per token,
+  so this is the laptop CPU throttling during an 80-minute run (the rotation is cyclic, so each mode always follows
+  the same one). Differences of that size here are not meaningful; the effects above are several times larger.
+- **Docker:** `docker compose up --build` (CPU image, 1.5 GB, mostly PyTorch); weights are downloaded on first
+  start into a cache volume. Under the load test the container peaked at 1.56 GiB of its 2 GiB `mem_limit`, with no
+  OOM kill or restart; 720 MiB of that is the preallocated KV cache (8 slots x 2048 tokens), and `MAX_LEN=1024`
+  halves it.
 
 ### Quantization (CPU, SmolLM2-135M)
 
