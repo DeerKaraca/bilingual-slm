@@ -1,0 +1,64 @@
+{
+  "model": "export/bilingual-slm-42m-tr050",
+  "threads": 4,
+  "eval_tokens_per_lang": 16384,
+  "seq_len": 512,
+  "timing_rounds": 5,
+  "rows": [
+    {
+      "variant": "none",
+      "weights_mb": 162.0505495071411,
+      "prefill_256_ms": 468.35476899968853,
+      "decode_tok_s_b1": 30.617837339683085,
+      "decode_tok_s_b8": 158.81539783348467,
+      "tr_bpb": 1.1629077265149907,
+      "tr_top1_agreement": 1.0,
+      "en_bpb": 1.250053535271121,
+      "en_top1_agreement": 1.0
+    },
+    {
+      "variant": "int8",
+      "weights_mb": 88.72379779815674,
+      "prefill_256_ms": 432.12837799956105,
+      "decode_tok_s_b1": 24.981482515122615,
+      "decode_tok_s_b8": 107.37071091317632,
+      "tr_bpb": 1.1628543185985751,
+      "tr_top1_agreement": 0.9897303581237793,
+      "en_bpb": 1.2501246941890645,
+      "en_top1_agreement": 0.9921244978904724
+    },
+    {
+      "variant": "int8-emb",
+      "weights_mb": 40.84897804260254,
+      "prefill_256_ms": 511.44332600006237,
+      "decode_tok_s_b1": 12.992357770918325,
+      "decode_tok_s_b8": 74.41438399277173,
+      "tr_bpb": 1.162877914838992,
+      "tr_top1_agreement": 0.9873362183570862,
+      "en_bpb": 1.2501714473408632,
+      "en_top1_agreement": 0.9904863834381104
+    },
+    {
+      "variant": "dynamic",
+      "weights_mb": 88.5729627609253,
+      "prefill_256_ms": 368.7069400002656,
+      "decode_tok_s_b1": 42.414959613097245,
+      "decode_tok_s_b8": 178.3302189133176,
+      "tr_bpb": 1.1965460935007401,
+      "tr_top1_agreement": 0.7879914045333862,
+      "en_bpb": 1.2830901482068278,
+      "en_top1_agreement": 0.815650224685669
+    },
+    {
+      "variant": "dynamic-head",
+      "weights_mb": 104.5738115310669,
+      "prefill_256_ms": 294.83154799982003,
+      "decode_tok_s_b1": 64.86215765863678,
+      "decode_tok_s_b8": 305.2194261382539,
+      "tr_bpb": 1.1968536594973171,
+      "tr_top1_agreement": 0.7857232689857483,
+      "en_bpb": 1.283276495557971,
+      "en_top1_agreement": 0.8157762289047241
+    }
+  ]
+}

@@ -3,6 +3,8 @@ name = "bilingual-slm"
 version = "0.1.0"
 description = "Turkish-English small language model trained from scratch, plus a hand-written inference server."
 requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 dependencies = [
     "torch>=2.1",
     "numpy",
@@ -16,7 +18,7 @@ server = ["fastapi", "uvicorn", "tokenizers", "safetensors", "jinja2", "huggingf
 dev = ["pytest", "httpx", "transformers", "matplotlib"]  # transformers: reference for parity tests only
 
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=77"]  # SPDX license expression (PEP 639)
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
