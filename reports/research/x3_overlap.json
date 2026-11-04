@@ -1,0 +1,4 @@
+[
+ {"lang": "tr", "seed": 0, "unique_sequences": 175718, "n": 13, "val_ngrams": 2221639, "overlap_fraction": 0.0327},
+ {"lang": "tr", "seed": 1, "unique_sequences": 175718, "n": 13, "val_ngrams": 2221639, "overlap_fraction": 0.0319}
+]

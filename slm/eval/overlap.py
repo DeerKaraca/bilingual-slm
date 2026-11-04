@@ -46,6 +46,39 @@ def overlap(tokens_dir, lang: str, seed: int, unique_sequences: int, seq_len: in
             "val_ngrams": int(len(val)), "overlap_fraction": float(np.isin(val, train).mean())}
 
 
+def contaminated_documents(tokens_dir, lang: str, eot: int, seeds: list[int], unique_sequences: int,
+                           seq_len: int = 1024, n: int = 13, chunk: int = 2048) -> tuple[np.ndarray, np.ndarray]:
+    """Mark validation documents that share any n-gram with the training windows of any of `seeds`.
+
+    Returns (doc_start, contaminated): the token offset of every document (each starts with `eot`)
+    and a boolean per document. Memory stays small by keeping only the 2M validation hashes and
+    streaming the ~180M training hashes past them in chunks.
+    """
+    val = np.asarray(load_tokens(tokens_dir, lang, "val"))
+    doc_start = np.flatnonzero(val == eot)
+    hashes = ngram_hashes(val[None, :], n)
+    doc_of = np.searchsorted(doc_start, np.arange(len(hashes)), side="right") - 1
+    # n-grams that cross into the next document belong to neither: never count them.
+    within = np.searchsorted(doc_start, np.arange(len(hashes)) + n - 1, side="right") - 1 == doc_of
+    unique = np.unique(hashes[within])
+    found = np.zeros(len(unique), dtype=bool)
+
+    data = load_tokens(tokens_dir, lang, "train")
+    offsets = np.arange(seq_len + 1)
+    for seed in seeds:
+        windows = np.random.default_rng(seed).permutation((len(data) - 1) // seq_len)[:unique_sequences]
+        for i in range(0, len(windows), chunk):
+            train = ngram_hashes(data[(windows[i:i + chunk] * seq_len)[:, None] + offsets], n)
+            pos = np.minimum(np.searchsorted(unique, train), len(unique) - 1)
+            found[pos[unique[pos] == train]] = True
+
+    hit = np.zeros(len(hashes), dtype=bool)
+    hit[within] = found[np.searchsorted(unique, hashes[within])]
+    contaminated = np.zeros(len(doc_start), dtype=bool)
+    contaminated[np.unique(doc_of[hit])] = True
+    return doc_start, contaminated
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--tokens-dir", default="data/tokens")

@@ -105,15 +105,18 @@ Validation bits per byte (lower is better) on held-out Turkish and English text 
 never used for training). Bits per byte, unlike perplexity, does not depend on the tokenizer, so
 the two languages and other models can be compared.
 
-| Model (all 42.5M, 600M training tokens) | Turkish BPB | English BPB |
-|---|---|---|
-| English only (`tr000`) | 2.733 | **1.118** |
-| 30% Turkish (`tr030`) | 1.216 | 1.147 |
-| **50% Turkish (this model)** | **1.177** | **1.179** |
-| Turkish only (`tr100`) | **1.120** | 1.746 |
+All five mixtures of the project, same architecture, tokenizer and 600M training tokens:
 
-With half the data of each language, this mix stays 5.1% (Turkish) and 5.5% (English) behind the
-monolingual models.
+| Turkish share of the training mix | Turkish BPB | English BPB |
+|---|---|---|
+| 0% (`tr000`, English only) | 2.733 | **1.118** |
+| 10% (`tr010`) | 1.316 | 1.125 |
+| 30% (`tr030`) | 1.216 | 1.147 |
+| **50% (`tr050`, this model)** | 1.177 | 1.179 |
+| 100% (`tr100`, Turkish only) | **1.120** | 1.746 |
+
+This run is the one published because it is the most balanced: with half the data of each
+language it stays 5.1% (Turkish) and 5.5% (English) behind the monolingual models.
 
 <!-- TODO before publishing: one sentence on the main finding, updated with the result of the
 compute-matched control (reports/analysis_plan_addendum.md). -->
