@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import math
 
 import numpy as np
@@ -83,6 +84,51 @@ def test_loader_checks_capacity_and_opens_only_needed_languages(id_tokens):
         MixtureLoader(id_tokens, 1.0, 4, 8, 0, n_sequences=125)  # only 124 windows per language
     assert set(MixtureLoader(id_tokens, 0.0, 4, 8, 0, 8).data) == {"en"}
     assert set(MixtureLoader(id_tokens, 1.0, 4, 8, 0, 8).data) == {"tr"}
+
+
+TRAIN_V1_BATCHES = {  # sha256 of 10 batches from the train-v1 loader (commit 9313d67) on id_tokens
+    0.0: "4245d84119a43ce991bc5dc407110665e1020a829b381391c590b06f31b270ad",
+    0.3: "205a9ef6a96f5c22025e7a49440a4d7b366fc95257cccc488cf1959a73bab1a9",
+    1.0: "1572df17de79beb09da26d6c73272012b9b317c172d3ade6f0c9ae74bc008684",
+}
+
+
+@pytest.mark.parametrize("fraction", TRAIN_V1_BATCHES)
+def test_loader_without_cap_reproduces_train_v1(id_tokens, fraction):
+    """The repetition option must not change the runs trained with train-v1."""
+    loader = MixtureLoader(id_tokens, fraction, batch_size=4, seq_len=8, seed=0, n_sequences=40)
+    h = hashlib.sha256()
+    for _ in range(10):
+        x, y = loader.next_batch()
+        h.update(x.numpy().tobytes())
+        h.update(y.numpy().tobytes())
+    assert h.hexdigest() == TRAIN_V1_BATCHES[fraction]
+
+
+def test_capped_loader_repeats_its_pool(id_tokens):
+    pool = 30
+    capped = MixtureLoader(id_tokens, 1.0, batch_size=10, seq_len=8, seed=0, n_sequences=100, unique_sequences=pool)
+    plain = MixtureLoader(id_tokens, 1.0, batch_size=10, seq_len=8, seed=0, n_sequences=100)
+    starts = read_all(capped, 10)[:, 0]
+    passes = [starts[i:i + pool].tolist() for i in range(0, 100, pool)]
+    assert passes[0] == read_all(plain, 3)[:pool, 0].tolist()  # first pass = the uncapped order
+    assert all(sorted(p) == sorted(passes[0]) for p in passes[1:3])  # same windows, nothing new
+    assert passes[1] != passes[0] and passes[2] != passes[1]  # but reshuffled every pass
+    assert set(passes[3]) <= set(passes[0])  # the last, partial pass too
+
+
+def test_capped_loader_resumes_across_passes(id_tokens):
+    make = lambda: MixtureLoader(id_tokens, 1.0, 7, 8, 0, n_sequences=70, unique_sequences=20)  # noqa: E731
+    loader = make()
+    read_all(loader, 4)  # 28 windows: already in the second pass
+    resumed = make()
+    resumed.load_state_dict(loader.state_dict())
+    assert torch.equal(resumed.next_batch()[0], loader.next_batch()[0])
+
+
+def test_capped_loader_rejects_a_pool_larger_than_the_data(id_tokens):
+    with pytest.raises(ValueError):
+        MixtureLoader(id_tokens, 1.0, 4, 8, 0, n_sequences=8, unique_sequences=125)
 
 
 def test_compile_disabled_on_old_gpus(monkeypatch):

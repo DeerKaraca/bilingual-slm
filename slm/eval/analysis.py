@@ -1,9 +1,10 @@
-"""Research results from the runs' log.csv files, following reports/analysis_plan.md.
+"""Research results from the runs' log.csv files, following reports/analysis_plan.md and its
+addendum (reports/analysis_plan_addendum.md) for the compute-matched control.
 
     python -m slm.eval.analysis --runs-dir runs
     python -m slm.eval.analysis --hub-repo USER/bilingual-slm-runs   # download the log.csv files first
 
-Writes results.md, results.json and four figures to reports/research/. Unfinished runs appear in
+Writes results.md, results.json and the figures to reports/research/. Unfinished runs appear in
 the curves but not in the final-step results, so the script can be run while training continues.
 """
 
@@ -20,6 +21,8 @@ from slm.plotting import CATEGORICAL, INK_2, SEQUENTIAL, end_label, figure, lege
 
 MIXTURES = ["tr000", "tr010", "tr030", "tr050", "tr100"]
 CONTROL, SEED = "tr_only_control", "tr030_seed1"
+X3, X3_SEED = "tr_only_control_x3", "tr_only_control_x3_seed1"  # addendum: compute-matched control
+ALL_RUNS = [*MIXTURES, CONTROL, SEED, X3, X3_SEED]
 MONOLINGUAL = {"tr": "tr100", "en": "tr000"}
 LANGS = {"tr": "Turkish", "en": "English"}
 
@@ -31,6 +34,7 @@ class Run:
     complete: bool
     tokens: np.ndarray  # total training tokens at each evaluation
     bpb: dict[str, np.ndarray]  # language -> validation BPB at each evaluation
+    pass_tokens: float | None = None  # tokens in one pass over a capped pool of windows (repeat runs)
 
     def share(self, lang: str) -> float:
         return self.tr_share if lang == "tr" else 1 - self.tr_share
@@ -53,22 +57,25 @@ def load_run(runs_dir: Path, name: str) -> Run | None:
         return None
     cfg = load_config(Path("configs/experiments") / f"{name}.yaml")
     column = lambda key: np.array([float(r[key]) for r in rows])  # noqa: E731
+    pool = cfg.data.unique_sequences
     return Run(name, cfg.data.tr_fraction, int(rows[-1]["step"]) == cfg.total_steps,
-               column("tokens"), {lang: column(f"{lang}_bpb") for lang in LANGS})
+               column("tokens"), {lang: column(f"{lang}_bpb") for lang in LANGS},
+               pool * cfg.model.context_len if pool else None)
 
 
 def download_logs(hub_repo: str, runs_dir: Path):
     from huggingface_hub import hf_hub_download
     from huggingface_hub.errors import EntryNotFoundError
 
-    for name in [*MIXTURES, CONTROL, SEED]:
+    for name in ALL_RUNS:
         try:
             hf_hub_download(hub_repo, f"{name}/log.csv", local_dir=runs_dir)
         except EntryNotFoundError:
             pass  # not started yet
 
 
-def verdict(diff: float, noise: float | None, above: str, below: str) -> str:
+def verdict(diff: float, noise: float | None, above: str, below: str,
+            within: str = "inconclusive at this noise level") -> str:
     """Pre-registered rule: a difference counts only beyond twice the seed-to-seed range."""
     if noise is None:
         return "no seed-noise estimate yet"
@@ -76,7 +83,7 @@ def verdict(diff: float, noise: float | None, above: str, below: str) -> str:
         return above
     if diff < -2 * noise:
         return below
-    return "inconclusive at this noise level"
+    return within
 
 
 def analyse(runs: dict[str, Run]) -> dict:
@@ -124,6 +131,31 @@ def analyse(runs: dict[str, Run]) -> dict:
                 "gap": gap, "verdict": verdict(gap, noise and noise[lang], "interference likely",
                                                "below the monolingual curve (curve not schedule-matched)"),
             })
+
+    noise_tr = noise and noise["tr"]
+    if tr030 and X3 in done:
+        x3_runs = [done[n] for n in (X3, X3_SEED) if n in done]
+        x3 = sum(r.final("tr") for r in x3_runs) / len(x3_runs)
+        diff = x3 - tr030["tr"]
+        result["compute_matched"] = {
+            "x3_tr_bpb": x3, "tr030_tr_bpb": tr030["tr"], "diff": diff, "noise": noise_tr,
+            "x3_seed_range": abs(x3_runs[0].final("tr") - x3_runs[1].final("tr")) if len(x3_runs) == 2 else None,
+            "verdict": verdict(diff, noise_tr, "the mixture is better at equal compute: the gain is attributed to English",
+                               "at equal compute, repeating Turkish beats adding English",
+                               "the two cannot be distinguished at this noise level"),
+        }
+    result["overfitting"] = []
+    for name in (X3, X3_SEED):
+        run = done.get(name)
+        if run is None:
+            continue
+        i = int(np.argmin(run.bpb["tr"]))
+        rise = run.final("tr") - float(run.bpb["tr"][i])
+        result["overfitting"].append({
+            "run": name, "lowest_tr_bpb": float(run.bpb["tr"][i]), "lowest_at_tokens": float(run.tokens[i]),
+            "lowest_in_pass": int(run.tokens[i] // run.pass_tokens) + 1, "final_tr_bpb": run.final("tr"), "rise": rise,
+            "verdict": "no overfitting visible" if noise_tr is None or rise <= 2 * noise_tr else "overfitting visible",
+        })
     return result
 
 
@@ -208,6 +240,28 @@ def plot_seed_noise(runs: dict[str, Run], out: Path):
     save(fig, out)
 
 
+def plot_repeat_control(runs: dict[str, Run], out: Path):
+    """Figure 5: tr030 vs the compute-matched Turkish-only control, with the control's passes marked."""
+    if X3 not in runs:
+        return
+    fig, axes = figure()
+    ax = axes[0, 0]
+    for name, label, color, dashed in [("tr030", "30% Turkish (seed 0)", CATEGORICAL[0], False),
+                                       (SEED, "30% Turkish (seed 1)", CATEGORICAL[0], True),
+                                       (X3, "Turkish only, its Turkish repeated (seed 0)", CATEGORICAL[1], False),
+                                       (X3_SEED, "Turkish only, its Turkish repeated (seed 1)", CATEGORICAL[1], True)]:
+        if name in runs:
+            line(ax, runs[name].tokens / 1e6, runs[name].bpb["tr"], color, label, dashed)
+    x3 = runs[X3]
+    for k in range(1, int(x3.tokens[-1] // x3.pass_tokens) + 1):
+        ax.axvline(k * x3.pass_tokens / 1e6, color=INK_2, linewidth=0.6, linestyle=":")
+        ax.annotate(f"pass {k + 1}", (k * x3.pass_tokens / 1e6, 1), xycoords=("data", "axes fraction"),
+                    xytext=(3, -12), textcoords="offset points", fontsize=7, color=INK_2)
+    style(ax, "Turkish BPB at equal compute: mixture vs repeated Turkish", "total tokens (M)", "bits per byte")
+    legend(ax, loc="upper right")
+    save(fig, out)
+
+
 def to_markdown(result: dict) -> str:
     lines = ["# Research results", "", "Analysis as pre-registered in [analysis_plan.md](../analysis_plan.md).", "",
              f"Complete runs: {', '.join(result['complete']) or 'none yet'}.", "",
@@ -229,6 +283,18 @@ def to_markdown(result: dict) -> str:
         for q in result["interference"]:
             lines.append(f"| {q['run']} | {q['lang'].upper()} | {q['tokens'] / 1e6:.0f}M | {q['final_bpb']:.4f} | "
                          f"{q['monolingual_curve_bpb']:.4f} | {q['gap']:+.4f} | {q['verdict']} |")
+    if "compute_matched" in result:
+        c = result["compute_matched"]
+        seed_range = "" if c["x3_seed_range"] is None else f"; x3 seed range {c['x3_seed_range']:.4f}"
+        lines += ["", "**Addendum, compute-matched control** ([analysis_plan_addendum.md](../analysis_plan_addendum.md)): "
+                      f"x3 control {c['x3_tr_bpb']:.4f} vs tr030 {c['tr030_tr_bpb']:.4f} TR BPB (seed means), "
+                      f"diff {c['diff']:+.4f} (noise {c['noise']:.4f}{seed_range}) -> {c['verdict']}."]
+    if result["overfitting"]:
+        lines += ["", "| Repeat run | Lowest TR BPB | At tokens | In pass | Final TR BPB | Rise | Reading |",
+                  "|---|---|---|---|---|---|---|"]
+        for o in result["overfitting"]:
+            lines.append(f"| {o['run']} | {o['lowest_tr_bpb']:.4f} | {o['lowest_at_tokens'] / 1e6:.0f}M | "
+                         f"{o['lowest_in_pass']} | {o['final_tr_bpb']:.4f} | {o['rise']:+.4f} | {o['verdict']} |")
     return "\n".join(lines) + "\n"
 
 
@@ -241,13 +307,14 @@ def main():
 
     if args.hub_repo:
         download_logs(args.hub_repo, args.runs_dir)
-    runs = {name: run for name in [*MIXTURES, CONTROL, SEED] if (run := load_run(args.runs_dir, name))}
+    runs = {name: run for name in ALL_RUNS if (run := load_run(args.runs_dir, name))}
     result = analyse(runs)
     args.out.mkdir(parents=True, exist_ok=True)
     plot_curves(runs, args.out / "curves.png")
     plot_final_vs_share(runs, args.out / "final_vs_share.png")
     plot_transfer(runs, result, args.out / "transfer.png")
     plot_seed_noise(runs, args.out / "seed_noise.png")
+    plot_repeat_control(runs, args.out / "repeat_control.png")
     (args.out / "results.json").write_text(json.dumps(result, indent=2, default=float))
     (args.out / "results.md").write_text(to_markdown(result))
     print(to_markdown(result))

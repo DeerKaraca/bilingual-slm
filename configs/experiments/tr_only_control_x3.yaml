@@ -1,0 +1,9 @@
+# Compute-matched control for tr030: Turkish only, exactly the 175,718 Turkish windows tr030 saw
+# (same seed -> same window order), repeated ~3.3 times to the same 600M tokens and 2,288 steps.
+# tr030 minus this run isolates what English adds beyond extra optimizer steps on Turkish.
+name: tr_only_control_x3
+data:
+  tr_fraction: 1.0
+  unique_sequences: 175_718
+train:
+  seed: 0

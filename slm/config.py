@@ -36,6 +36,8 @@ class DataConfig:
     tr_fraction: float = 0.5  # share of Turkish tokens in the training mix
     tokens_dir: str = "data/tokens"  # {lang}/{split}.bin from slm.data.tokenize
     tokenizer: str = "assets/tokenizer.json"
+    # Cap on distinct windows per language; the run cycles through them (compute-matched repeat control).
+    unique_sequences: int | None = None
 
 
 @dataclass

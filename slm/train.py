@@ -79,7 +79,8 @@ def train(cfg: Config, device: torch.device):
     scaler = torch.amp.GradScaler(device.type, enabled=cuda)
     n_sequences = cfg.total_steps * t.grad_accum_steps * t.micro_batch_size
     loader = MixtureLoader(
-        cfg.data.tokens_dir, cfg.data.tr_fraction, t.micro_batch_size, cfg.model.context_len, t.seed, n_sequences
+        cfg.data.tokens_dir, cfg.data.tr_fraction, t.micro_batch_size, cfg.model.context_len, t.seed, n_sequences,
+        cfg.data.unique_sequences,
     )
     val = {lang: load_tokens(cfg.data.tokens_dir, lang, "val") for lang in ("tr", "en")}
     byte_lengths = token_byte_lengths(Tokenizer.from_file(cfg.data.tokenizer))
