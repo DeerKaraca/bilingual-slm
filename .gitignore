@@ -11,3 +11,4 @@ __pycache__/
 # Server logs written by the load test (diagnostics, not results)
 reports/logs/
 /export/
+reports/research/logs/.cache/

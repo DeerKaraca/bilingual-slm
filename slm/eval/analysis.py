@@ -1,8 +1,8 @@
 """Research results from the runs' log.csv files, following reports/analysis_plan.md and its
 addendum (reports/analysis_plan_addendum.md) for the compute-matched control.
 
-    python -m slm.eval.analysis --runs-dir runs
-    python -m slm.eval.analysis --hub-repo USER/bilingual-slm-runs   # download the log.csv files first
+    python -m slm.eval.analysis                                      # the log.csv files kept in the repo
+    python -m slm.eval.analysis --hub-repo USER/bilingual-slm-runs   # refresh them from the Hub first
 
 Writes results.md, results.json and the figures to reports/research/. Unfinished runs appear in
 the curves but not in the final-step results, so the script can be run while training continues.
@@ -300,7 +300,7 @@ def to_markdown(result: dict) -> str:
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    p.add_argument("--runs-dir", type=Path, default=Path("reports/research/logs"), help="{run}/log.csv files")
     p.add_argument("--hub-repo", help="download each run's log.csv from this HF model repo first")
     p.add_argument("--out", type=Path, default=Path("reports/research"))
     args = p.parse_args()
