@@ -163,10 +163,13 @@ and shifts the validation distribution towards short ones.
 | tr_only_control | 1.2780 | 1.2789 | 1.2798 | 1.2793 |
 | **x3 − tr030** | **−0.0866** | **−0.0857** | **−0.0845** | **−0.0795** |
 
-x3's BPB rises more than tr030's as overlapping documents go (+0.011 vs +0.004), consistent with a
-small advantage from the repeated text; even on the strictest subset that, together with the shift in
-document length, accounts for at most ~8% of the gap. All values come from one float16
-evaluation pass per model on a GPU; the full-validation column matches the training logs to four decimals.
+As overlapping documents are removed, x3's BPB rises more than tr030's (+0.011 vs +0.004) while the
+control's barely moves (+0.001): repetition gives x3 a small memorisation advantage. Removing only the
+near-duplicates (>20% overlapping) narrows the gap by just 0.002 BPB. How much of the larger narrowing on
+the "any overlap" subset (0.007 BPB, ~8% of the gap) comes from memorisation and how much from that subset's
+shift towards short documents cannot be separated. All values come from one float16
+evaluation pass per model on a GPU (notebook 04, run from `main` at commit `d0258ca`); the full-validation column matches
+the training logs to four decimals.
 
 ## Limitations
 

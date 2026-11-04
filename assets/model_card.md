@@ -21,7 +21,8 @@ A 42.5M-parameter Turkish–English **base** language model trained from scratch
 half Turkish and half English. It is the `tr050` run of a research project on how the
 Turkish/English ratio of the training mix affects each language:
 **[github.com/DeerKaraca/bilingual-slm](https://github.com/DeerKaraca/bilingual-slm)**
-(code, data pipeline, all experiments, analysis and a hand-written inference server).
+(code, data pipeline, all experiments, analysis and an inference server written from scratch, without
+serving libraries).
 
 > **Not instruction-tuned.** This is a plain next-token predictor: it continues text, it does not
 > follow instructions or chat, and it has no chat template. It is a research artifact and a small
@@ -102,8 +103,8 @@ unused `<|im_start|>` / `<|im_end|>`.
 ## Evaluation
 
 Validation bits per byte (lower is better) on held-out Turkish and English text (10.5 MB each,
-never used for training). Bits per byte, unlike perplexity, does not depend on the tokenizer, so
-the two languages and other models can be compared.
+never used for training). Bits per byte is normalized by bytes of text rather than tokens, so it can
+be compared across languages and tokenizers.
 
 All five mixtures of the project, same architecture, tokenizer and 600M training tokens:
 
@@ -118,12 +119,14 @@ All five mixtures of the project, same architecture, tokenizer and 600M training
 This run is the one published because it is the most balanced: with half the data of each
 language it stays 5.1% (Turkish) and 5.4% (English) behind the monolingual models.
 
-The project's main finding: at equal compute, repeating the same 180M Turkish tokens ~3.3 times beats
+The project's main finding, in this 42.5M-parameter setting: at equal compute, repeating the same 180M
+Turkish tokens ~3.3 times beats
 adding 420M English tokens by 0.087 Turkish BPB (72× the seed noise) and comes within 0.010 BPB of fresh
 Turkish data. English does help Turkish against a shorter-trained control, but it is less than half as
-valuable as repeating Turkish itself. See the
-[research report](https://github.com/DeerKaraca/bilingual-slm/blob/main/reports/research/README.md) for
-the pre-registered decision rules, the controls and the caveats.
+valuable as repeating Turkish itself, and the setup cannot tell how much of its gain is transferred
+knowledge versus extra training. Larger models may behave differently; the report discusses this.
+See the [research report](https://github.com/DeerKaraca/bilingual-slm/blob/main/reports/research/README.md)
+for the pre-registered decision rules, the controls and the caveats.
 
 ## Limitations
 
