@@ -6,7 +6,9 @@
     "tr030_seed1",
     "tr050",
     "tr100",
-    "tr_only_control"
+    "tr_only_control",
+    "tr_only_control_x3",
+    "tr_only_control_x3_seed1"
   ],
   "final": {
     "tr000": {
@@ -57,6 +59,20 @@
       "en_tokens": 419849830.4,
       "tr_bpb": 1.217,
       "en_bpb": 1.1472
+    },
+    "tr_only_control_x3": {
+      "tr_share": 1.0,
+      "tr_tokens": 599785472.0,
+      "en_tokens": 0.0,
+      "tr_bpb": 1.1293,
+      "en_bpb": 1.7775
+    },
+    "tr_only_control_x3_seed1": {
+      "tr_share": 1.0,
+      "tr_tokens": 599785472.0,
+      "en_tokens": 0.0,
+      "tr_bpb": 1.1302,
+      "en_bpb": 1.7805
     }
   },
   "noise": {
@@ -126,6 +142,34 @@
       "monolingual_curve_bpb": 1.18864,
       "gap": -0.009339999999999904,
       "verdict": "below the monolingual curve (curve not schedule-matched)"
+    }
+  ],
+  "compute_matched": {
+    "x3_tr_bpb": 1.12975,
+    "tr030_tr_bpb": 1.2164000000000001,
+    "diff": -0.08665000000000012,
+    "noise": 0.0012000000000000899,
+    "x3_seed_range": 0.0009000000000001229,
+    "verdict": "at equal compute, repeating Turkish beats adding English"
+  },
+  "overfitting": [
+    {
+      "run": "tr_only_control_x3",
+      "lowest_tr_bpb": 1.1293,
+      "lowest_at_tokens": 599785472.0,
+      "lowest_in_pass": 4,
+      "final_tr_bpb": 1.1293,
+      "rise": 0.0,
+      "verdict": "no overfitting visible"
+    },
+    {
+      "run": "tr_only_control_x3_seed1",
+      "lowest_tr_bpb": 1.1302,
+      "lowest_at_tokens": 599785472.0,
+      "lowest_in_pass": 4,
+      "final_tr_bpb": 1.1302,
+      "rise": 0.0,
+      "verdict": "no overfitting visible"
     }
   ]
 }

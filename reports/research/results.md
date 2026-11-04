@@ -2,7 +2,7 @@
 
 Analysis as pre-registered in [analysis_plan.md](../analysis_plan.md).
 
-Complete runs: tr000, tr010, tr030, tr030_seed1, tr050, tr100, tr_only_control.
+Complete runs: tr000, tr010, tr030, tr030_seed1, tr050, tr100, tr_only_control, tr_only_control_x3, tr_only_control_x3_seed1.
 
 | Run | Turkish share | Turkish tokens | English tokens | TR BPB | EN BPB |
 |---|---|---|---|---|---|
@@ -12,6 +12,8 @@ Complete runs: tr000, tr010, tr030, tr030_seed1, tr050, tr100, tr_only_control.
 | tr030_seed1 | 30% | 180M | 420M | 1.2170 | 1.1472 |
 | tr050 | 50% | 300M | 300M | 1.1768 | 1.1793 |
 | tr100 | 100% | 600M | 0M | 1.1200 | 1.7456 |
+| tr_only_control_x3 | 100% | 600M | 0M | 1.1293 | 1.7775 |
+| tr_only_control_x3_seed1 | 100% | 600M | 0M | 1.1302 | 1.7805 |
 | tr_only_control | 100% | 180M | 0M | 1.2780 | 1.9698 |
 
 **Seed noise** (|tr030 - tr030_seed1|): TR 0.0012, EN 0.0007 BPB.
@@ -28,3 +30,10 @@ Complete runs: tr000, tr010, tr030, tr030_seed1, tr050, tr100, tr_only_control.
 | tr010 | EN | 540M | 1.1252 | 1.1237 | +0.0015 | interference likely |
 | tr030 | EN | 420M | 1.1465 | 1.1467 | -0.0002 | inconclusive at this noise level |
 | tr050 | EN | 300M | 1.1793 | 1.1886 | -0.0093 | below the monolingual curve (curve not schedule-matched) |
+
+**Addendum, compute-matched control** ([analysis_plan_addendum.md](../analysis_plan_addendum.md)): x3 control 1.1298 vs tr030 1.2164 TR BPB (seed means), diff -0.0867 (noise 0.0012; x3 seed range 0.0009) -> at equal compute, repeating Turkish beats adding English.
+
+| Repeat run | Lowest TR BPB | At tokens | In pass | Final TR BPB | Rise | Reading |
+|---|---|---|---|---|---|---|
+| tr_only_control_x3 | 1.1293 | 600M | 4 | 1.1293 | +0.0000 | no overfitting visible |
+| tr_only_control_x3_seed1 | 1.1302 | 600M | 4 | 1.1302 | +0.0000 | no overfitting visible |

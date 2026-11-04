@@ -258,7 +258,7 @@ def plot_repeat_control(runs: dict[str, Run], out: Path):
         ax.annotate(f"pass {k + 1}", (k * x3.pass_tokens / 1e6, 1), xycoords=("data", "axes fraction"),
                     xytext=(3, -12), textcoords="offset points", fontsize=7, color=INK_2)
     style(ax, "Turkish BPB at equal compute: mixture vs repeated Turkish", "total tokens (M)", "bits per byte")
-    legend(ax, loc="upper right")
+    legend(ax, loc="center right")  # the pass labels sit along the top edge
     save(fig, out)
 
 
