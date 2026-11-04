@@ -64,6 +64,9 @@ def main():
     lines = ["# Exploratory: compute-matched comparison on overlap-free validation documents", "",
              "Not part of the analysis plan. Validation documents sharing any 13-gram with the repeated training "
              "windows of either seed are removed; every model is re-evaluated on CPU in float32.", "",
+             "The subset is clean for every model listed: the loader reads Turkish windows in one seed-fixed order, so "
+             "tr030 and tr030_seed1 saw exactly the x3 pools of their seeds and tr_only_control saw the first 175,616 "
+             "of the seed-0 pool (English windows of the tr030 runs are not scanned).", "",
              f"Removed {summary['contaminated_documents']:,} of {summary['documents']:,} documents "
              f"({summary['val_tokens'] - summary['clean_tokens']:,} of {summary['val_tokens']:,} tokens).", "",
              "| Run | TR BPB, full validation | TR BPB, overlap-free documents |", "|---|---|---|"]
