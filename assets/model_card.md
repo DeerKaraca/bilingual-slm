@@ -116,11 +116,14 @@ All five mixtures of the project, same architecture, tokenizer and 600M training
 | 100% (`tr100`, Turkish only) | **1.120** | 1.746 |
 
 This run is the one published because it is the most balanced: with half the data of each
-language it stays 5.1% (Turkish) and 5.5% (English) behind the monolingual models.
+language it stays 5.1% (Turkish) and 5.4% (English) behind the monolingual models.
 
-<!-- TODO before publishing: one sentence on the main finding, updated with the result of the
-compute-matched control (reports/analysis_plan_addendum.md). -->
-See the repository for the full analysis, its pre-registered decision rules and its caveats.
+The project's main finding: at equal compute, repeating the same 180M Turkish tokens ~3.3 times beats
+adding 420M English tokens by 0.087 Turkish BPB (72× the seed noise) and comes within 0.010 BPB of fresh
+Turkish data. English does help Turkish against a shorter-trained control, but it is less than half as
+valuable as repeating Turkish itself. See the
+[research report](https://github.com/DeerKaraca/bilingual-slm/blob/main/reports/research/README.md) for
+the pre-registered decision rules, the controls and the caveats.
 
 ## Limitations
 

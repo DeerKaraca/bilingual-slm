@@ -1,0 +1,114 @@
+{
+  "density": [
+    {
+      "share": [
+        0,
+        0
+      ],
+      "documents": 2526,
+      "val_tokens": 1096130,
+      "mean_document_tokens": 433.9390340459224
+    },
+    {
+      "share": [
+        0,
+        0.01
+      ],
+      "documents": 297,
+      "val_tokens": 408243,
+      "mean_document_tokens": 1374.5555555555557
+    },
+    {
+      "share": [
+        0.01,
+        0.05
+      ],
+      "documents": 349,
+      "val_tokens": 300476,
+      "mean_document_tokens": 860.9627507163324
+    },
+    {
+      "share": [
+        0.05,
+        0.2
+      ],
+      "documents": 271,
+      "val_tokens": 253119,
+      "mean_document_tokens": 934.0184501845018
+    },
+    {
+      "share": [
+        0.2,
+        0.5
+      ],
+      "documents": 178,
+      "val_tokens": 119801,
+      "mean_document_tokens": 673.0393258426966
+    },
+    {
+      "share": [
+        0.5,
+        1
+      ],
+      "documents": 88,
+      "val_tokens": 43882,
+      "mean_document_tokens": 498.65909090909093
+    }
+  ],
+  "kept": {
+    "full validation": {
+      "documents": 3709,
+      "tokens": 2221651
+    },
+    "without documents >50% overlapping": {
+      "documents": 3621,
+      "tokens": 2177769
+    },
+    "without documents >20% overlapping": {
+      "documents": 3443,
+      "tokens": 2057968
+    },
+    "without any overlapping document": {
+      "documents": 2526,
+      "tokens": 1096130
+    }
+  },
+  "bpb": {
+    "tr030": {
+      "full validation": 1.2158142292750402,
+      "without documents >50% overlapping": 1.2167160119006268,
+      "without documents >20% overlapping": 1.2179998545742543,
+      "without any overlapping document": 1.2194748085909568
+    },
+    "tr030_seed1": {
+      "full validation": 1.2169709911221371,
+      "without documents >50% overlapping": 1.217900284857429,
+      "without documents >20% overlapping": 1.219102999302009,
+      "without any overlapping document": 1.2208924510930248
+    },
+    "tr_only_control_x3": {
+      "full validation": 1.129324671932652,
+      "without documents >50% overlapping": 1.1311190469726282,
+      "without documents >20% overlapping": 1.133554653710676,
+      "without any overlapping document": 1.1402613239091683
+    },
+    "tr_only_control_x3_seed1": {
+      "full validation": 1.130244246912948,
+      "without documents >50% overlapping": 1.1321032963506765,
+      "without documents >20% overlapping": 1.134553784163608,
+      "without any overlapping document": 1.1410233077549774
+    },
+    "tr_only_control": {
+      "full validation": 1.2780369547072665,
+      "without documents >50% overlapping": 1.2788765213509772,
+      "without documents >20% overlapping": 1.2797657467047412,
+      "without any overlapping document": 1.2793161799808843
+    }
+  },
+  "x3_minus_tr030": {
+    "full validation": -0.08660815077578876,
+    "without documents >50% overlapping": -0.08569697671737542,
+    "without documents >20% overlapping": -0.08449720800098959,
+    "without any overlapping document": -0.07954131400991793
+  }
+}
