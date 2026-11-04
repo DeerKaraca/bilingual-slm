@@ -46,13 +46,14 @@ def overlap(tokens_dir, lang: str, seed: int, unique_sequences: int, seq_len: in
             "val_ngrams": int(len(val)), "overlap_fraction": float(np.isin(val, train).mean())}
 
 
-def contaminated_documents(tokens_dir, lang: str, eot: int, seeds: list[int], unique_sequences: int,
-                           seq_len: int = 1024, n: int = 13, chunk: int = 2048) -> tuple[np.ndarray, np.ndarray]:
-    """Mark validation documents that share any n-gram with the training windows of any of `seeds`.
+def document_overlap(tokens_dir, lang: str, eot: int, seeds: list[int], unique_sequences: int,
+                     seq_len: int = 1024, n: int = 13, chunk: int = 2048) -> tuple[np.ndarray, np.ndarray]:
+    """Per validation document, the share of its n-grams that occur in the training windows of any of `seeds`.
 
-    Returns (doc_start, contaminated): the token offset of every document (each starts with `eot`)
-    and a boolean per document. Memory stays small by keeping only the 2M validation hashes and
-    streaming the ~180M training hashes past them in chunks.
+    Returns (doc_start, share): the token offset of every document (each starts with `eot`) and a
+    float per document; share > 0 means the document has at least one overlapping n-gram. Memory
+    stays small by keeping only the 2M validation hashes and streaming the ~180M training hashes
+    past them in chunks.
     """
     val = np.asarray(load_tokens(tokens_dir, lang, "val"))
     doc_start = np.flatnonzero(val == eot)
@@ -74,9 +75,9 @@ def contaminated_documents(tokens_dir, lang: str, eot: int, seeds: list[int], un
 
     hit = np.zeros(len(hashes), dtype=bool)
     hit[within] = found[np.searchsorted(unique, hashes[within])]
-    contaminated = np.zeros(len(doc_start), dtype=bool)
-    contaminated[np.unique(doc_of[hit])] = True
-    return doc_start, contaminated
+    hits = np.bincount(doc_of, weights=hit, minlength=len(doc_start))
+    total = np.bincount(doc_of, weights=within, minlength=len(doc_start))
+    return doc_start, hits / np.maximum(total, 1)
 
 
 def main():
