@@ -21,8 +21,7 @@ A 42.5M-parameter Turkish–English **base** language model trained from scratch
 half Turkish and half English. It is the `tr050` run of a research project on how the
 Turkish/English ratio of the training mix affects each language:
 **[github.com/DeerKaraca/bilingual-slm](https://github.com/DeerKaraca/bilingual-slm)**
-(code, data pipeline, all experiments, analysis and an inference server written from scratch, without
-serving libraries).
+(code, data pipeline, all experiments, analysis and a hand-written inference server).
 
 > **Not instruction-tuned.** This is a plain next-token predictor: it continues text, it does not
 > follow instructions or chat, and it has no chat template. It is a research artifact and a small
