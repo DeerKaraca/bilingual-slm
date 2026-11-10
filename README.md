@@ -1,86 +1,74 @@
 # bilingual-slm
 
-A ~40M-parameter Turkish–English language model trained from scratch, and a hand-written
-inference server for it (no vLLM / TGI).
+[![tests](https://github.com/DeerKaraca/bilingual-slm/actions/workflows/tests.yml/badge.svg)](https://github.com/DeerKaraca/bilingual-slm/actions/workflows/tests.yml)
+[![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![model](https://img.shields.io/badge/%F0%9F%A4%97%20model-bilingual--slm--42m--tr050-yellow)](https://huggingface.co/DeerKaraca/bilingual-slm-42m-tr050)
 
-**Research question:** how does the Turkish/English ratio in the pre-training mix affect
-performance in each language? How much does English transfer to Turkish, and when does one
-language start to hurt the other?
+Turkish–English language models trained from scratch, a controlled study of how the language mix
+affects them, and an inference server written from scratch, without serving libraries (no vLLM / TGI).
 
-> 🚧 Work in progress. Results and benchmark numbers will be filled in as the stages complete.
+- **Research:** nine 42.5M-parameter models trained on Kaggle T4 GPUs to measure how the Turkish/English
+  ratio affects each language ([full report](reports/research/README.md)).
+- **Model:** the 50/50 model is public on the Hugging Face Hub:
+  [DeerKaraca/bilingual-slm-42m-tr050](https://huggingface.co/DeerKaraca/bilingual-slm-42m-tr050).
+- **Server:** KV cache, continuous batching, SSE streaming, int8 quantization and an OpenAI-compatible API,
+  packaged with Docker and load-tested.
 
-## Plan
+## Research result
 
-| Part | What |
-|---|---|
-| Data | FineWeb-2 (Turkish) + FineWeb-Edu (English), streamed, cleaned, tokenized into shards |
-| Tokenizer | One shared 32k byte-level BPE for all runs; fertility reported per language |
-| Model | Decoder-only transformer: RoPE, RMSNorm, SwiGLU, fp16 mixed precision |
-| Experiments | 0 / 10 / 30 / 50 / 100 % Turkish at 600M tokens each, plus a Turkish-only control matched to the Turkish tokens of the 30 % run |
-| Metric | Per-language validation **bits-per-byte** (comparable across languages, unlike perplexity) |
-| Server | KV cache, continuous batching, SSE streaming, int8 weight-only quantization, OpenAI-compatible API, Docker, load tests |
+**In this 42.5M-parameter setting, at equal compute, repeating the same 180M Turkish tokens ~3.3 times beats
+adding 420M English tokens by 0.087 Turkish bits per byte (72× the seed noise), and comes within 0.010 BPB of
+fresh Turkish data.** English does help Turkish compared with a shorter-trained model, but it is less than half
+as valuable as repeating Turkish itself; whether that gain is transferred knowledge or extra training cannot be
+told apart here.
 
-## Repository layout
-
-```
-slm/            Python package (config, data, tokenizer, model, train, eval, server)
-configs/        YAML configs; experiments/ holds one file per run
-notebooks/      Kaggle notebooks (clone repo -> train with resume)
-benchmarks/     Load tests and server benchmarks
-reports/        Generated plots and research report
-tests/          Unit tests (run on CPU)
-```
-
-## Development
-
-Developed on Linux (WSL2) with Python 3.13, matching Kaggle.
-
-```bash
-uv venv
-uv pip install torch --index-url https://download.pytorch.org/whl/cpu
-uv pip install -e ".[dev,data,server]"
-.venv/bin/python -m pytest
-```
-
-## Pipeline
-
-| Step | Where | Command / notebook |
+| Run (42.5M parameters, 600M tokens unless noted) | Turkish data | Turkish BPB |
 |---|---|---|
-| 1. Stream + clean text | Kaggle CPU | `notebooks/01_prepare_data.ipynb` (`python -m slm.data.prepare`) |
-| 2. Tokenizer, fertility, token shards | Kaggle CPU | `notebooks/02_tokenize.ipynb` (`slm.tokenizer`, `slm.eval.fertility`, `slm.data.tokenize`) |
-| 3. Train (two runs per session, auto-resume) | Kaggle T4 x2 | `notebooks/03_train.ipynb` (`python -m slm.train --config configs/experiments/<run>.yaml`) |
+| Turkish-only control, 180M tokens (686 steps) | 180M, once | 1.278 |
+| 30% Turkish + 70% English (2 seeds) | 180M, once, + 420M English | 1.216 |
+| **Turkish-only, compute-matched (2 seeds)** | **the same 180M, ~3.3 times** | **1.130** |
+| Turkish-only | 600M distinct | 1.120 |
+
+<p><img src="reports/research/final_vs_share.png" width="49%"> <img src="reports/research/repeat_control.png" width="49%"></p>
+
+- **Mixing ratio:** 10% Turkish already brings most of the Turkish gain (2.73 → 1.32 BPB) at a 0.6% English cost.
+- **Robustness:** the result holds on validation subsets without any text overlapping the repeated training data
+  (gap 0.080 BPB on the strictest one), and the repeated runs show no overfitting.
+- **Method:** decision rules were committed before the runs ([plan](reports/analysis_plan.md),
+  [addendum](reports/analysis_plan_addendum.md)); key runs have two seeds.
+- **Context:** larger models may transfer more between languages; see the
+  [limitations](reports/research/README.md#limitations).
+
+## Model
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained("DeerKaraca/bilingual-slm-42m-tr050")
+model = AutoModelForCausalLM.from_pretrained("DeerKaraca/bilingual-slm-42m-tr050")
+```
+
+A base model, not instruction-tuned. One shared tokenizer for both languages: 1.77 tokens per Turkish word,
+against GPT-2's 3.78.
 
 ## Inference server
 
-Written from scratch on PyTorch + FastAPI (no vLLM / TGI). It serves our checkpoints and any
-Llama-architecture HF model; development uses [SmolLM2-135M](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct),
-whose layout (RMSNorm, RoPE, SwiGLU, tied embeddings) matches ours plus grouped-query attention.
-
 ```bash
-python -m slm.server --model HuggingFaceTB/SmolLM2-135M-Instruct   # or: --model runs/tr030/final.pt --tokenizer assets/tokenizer.json
-curl localhost:8000/v1/chat/completions -H "Content-Type: application/json"   -d '{"messages": [{"role": "user", "content": "What is the capital of France?"}], "stream": true}'
+python -m slm.server --model DeerKaraca/bilingual-slm-42m-tr050
+curl localhost:8000/v1/completions -H "Content-Type: application/json" \
+  -d '{"prompt": "Bilim insanları yeni bir araştırmada", "max_tokens": 40, "stream": true}'
+docker compose up --build
 ```
 
-- **Engine:** one thread owns the model and a preallocated slot-based KV cache; every step decodes one token for all
-  active requests, each at its own position. Attention is cut at the longest active sequence, not at the cache size.
-- **Modes** (`--mode`): `no_cache`, `sequential`, `static` batching, `continuous` batching (default).
-- **API:** `/v1/completions`, `/v1/chat/completions` (ChatML via the model's own chat template; models without
-  instruction tuning get a clear 400), `/v1/models`, `/health`. SSE streaming, `temperature`, `top_p`, `top_k`,
-  `stop`, `seed`. Disconnected clients free their slot immediately.
-- **Correctness:** `benchmarks/parity.py` loads SmolLM2-135M-Instruct into our model and compares it with
-  `transformers` in float32: max logit difference 5.4e-5 for one forward pass. It then decodes four prompts of
-  different lengths through the engine at once (KV cache, continuous batching, two requests finishing early so slots
-  are compacted, one joining mid-flight) against a full-recompute greedy loop in `transformers`: all 76 tokens
-  identical, max logit difference 7.5e-5 over every decode step.
+- **Engine:** one thread owns the model and a preallocated KV cache; each step decodes one token for every
+  active request. Modes: `no_cache`, `sequential`, `static`, `continuous` (default).
+- **API:** `/v1/completions`, `/v1/chat/completions`, `/v1/models`, `/health`, with SSE streaming.
+- **Correctness:** logits match `transformers` to within 1e-4, and batched decoding gives exactly the same tokens as a
+  simple reference loop.
 
 ### Serving benchmark (CPU, SmolLM2-135M-Instruct)
 
-`benchmarks/loadtest.py` is an async client (httpx + SSE) that starts the server in each mode and measures
-time to first token, inter-token latency and throughput. Server pinned to 3 torch threads on a 4-core Ryzen 5 3500U,
-leaving one core for the client; greedy decoding with `ignore_eos` so every request generates exactly its
-`max_tokens`; each server is warmed up with a full batch. 4 rounds with the mode order rotated each round:
-throughput is the median over rounds, latency percentiles pool all rounds (p95 from 64 requests, so approximate).
-Full tables: [reports/serving.md](reports/serving.md).
+Ryzen 5 3500U, 3 threads. Setup and full tables: [reports/serving.md](reports/serving.md).
 
 <p><img src="reports/serving_kv_cache.png" width="49%"> <img src="reports/serving_throughput.png" width="49%"></p>
 
@@ -90,62 +78,65 @@ Full tables: [reports/serving.md](reports/serving.md).
 | static batching | 15.3 tok/s | 7.0 s | 20.7 s / 33.1 s |
 | **continuous batching** | **21.5 tok/s** | **2.2 s** | **15.5 s** / 45.8 s |
 
-- **KV cache:** 4.8x faster at 16 output tokens and 9.1x at 128. With the cache the inter-token latency stays at
-  ~73 ms; without it every token recomputes the whole sequence, so it grows from 456 to 687 ms.
-- **Continuous batching** gives 2.2x the throughput of sequential serving and the first token 15x sooner. Against
-  static batching it gains 40% throughput and 3x faster first tokens: new requests take a free slot at the next step
-  instead of waiting for the whole batch. The price is a heavier tail (p95), because the batch never drains and long
-  requests keep sharing steps with newcomers.
-- **Found by benchmarking:** the decode step spent 43% of its time gathering KV-cache rows with an index list (a copy
-  per layer per step). The engine now keeps active requests in slots `0..n-1` and reads the cache as a slice, which
-  halved the CPU time of a batch-8 step.
-- **Noise level:** at one client the three modes run identical code, yet the long benchmark shows them up to ~25%
-  apart (7.8-9.9 tok/s). A short back-to-back check of the same workload gives all three the same 73 ms per token,
-  so this is the laptop CPU throttling during an 80-minute run (the rotation is cyclic, so each mode always follows
-  the same one). Differences of that size here are not meaningful; the effects above are several times larger.
-- **Docker:** `docker compose up --build` (CPU image, 1.5 GB, mostly PyTorch); weights are downloaded on first
-  start into a cache volume. Under the load test the container peaked at 1.56 GiB of its 2 GiB `mem_limit`, with no
-  OOM kill or restart; 720 MiB of that is the preallocated KV cache (8 slots x 2048 tokens), and `MAX_LEN=1024`
-  halves it.
+- **KV cache:** 4.8x faster at 16 output tokens and 9.1x at 128.
+- **Continuous batching:** 2.2x the throughput of sequential serving and the first token 15x sooner. The cost
+  is a heavier p95 tail, because long requests keep sharing steps with new ones.
+- **Found by benchmarking:** gathering KV-cache rows with an index list took 43% of a decode step; reading the
+  cache as one slice halved the CPU time of a batch-8 step.
+- **Noise:** likely laptop CPU throttling caused up to ~25% variation within a long benchmark, so small differences
+  are not meaningful.
+- **Docker:** peaks at 1.56 GiB under load, within a 2 GiB memory limit.
 
-### Quantization (CPU, SmolLM2-135M)
+### Quantization (CPU)
 
-`python -m slm.server --quant int8-emb` serves with our weight-only int8; full numbers in
-[reports/quantization.md](reports/quantization.md) (`benchmarks/quantization.py`), diagnosis in
-[reports/dynamic_quant_analysis.md](reports/dynamic_quant_analysis.md).
+| Variant | SmolLM2-135M: weights / EN BPB / top-1 agreement | tr050 (42.5M): weights / TR BPB / top-1 agreement |
+|---|---|---|
+| float32 | 513 MB / 0.9144 / 100% | 162 MB / 1.1629 / 100% |
+| int8 weight-only (ours) | 210 MB / 0.9161 / 96.8% | 89 MB / 1.1629 / 99.0% |
+| int8 + int8 embedding (ours) | **129 MB** / 0.9165 / 96.1% | **41 MB** / 1.1629 / 98.7% |
+| torch `quantize_dynamic` (reference) | 210 MB / 1.2270 / 50.1% | 89 MB / 1.1965 / 78.8% |
 
-| Variant | Weights | Decode tok/s (B=1 / B=8) | EN BPB | TR BPB | Top-1 agreement with fp32 (EN / TR) |
-|---|---|---|---|---|---|
-| float32 | 513 MB | 11.5 / 49.6 | 0.9144 | 2.1533 | 100% / 100% |
-| int8 weight-only (ours) | 210 MB | 6.7 / 36.1 | 0.9161 | 2.1564 | 96.8% / 95.2% |
-| int8 weight-only + int8 embedding (ours) | **129 MB** | 6.3 / 33.5 | 0.9165 | 2.1565 | 96.1% / 94.8% |
-| torch `quantize_dynamic` (reference) | 210 MB | 19.1 / 81.9 | 1.2270 | 3.1793 | 50.1% / 36.0% |
-| `quantize_dynamic` + lm_head | 237 MB | 23.3 / 118.3 | 1.2595 | 3.2557 | 47.6% / 34.1% |
+BPB here is measured on the first 16,384 tokens of each language's validation set in 512-token windows, the
+same text for every variant, so it is not comparable with the research results (tr050: 1.177 on the full set).
 
-- **Weight-only int8 is almost lossless** (+0.002 BPB) and cuts weights 4x once the tied embedding table is int8 too.
-  Quantizing the embedding saves another 81 MB (39%) for +0.0004 BPB.
-- **It is slower on this CPU, not faster.** Decoding is memory-bound (~10 GB/s on a Ryzen 5 3500U, so reading 513 MB
-  of fp32 weights alone caps B=1 at ~19 tok/s). Without a fused kernel, eager PyTorch must cast int8 to a float
-  copy on every call, which costs more bandwidth than it saves. PyTorch's fused `_weight_int8pack_mm` was only 7%
-  faster than fp32 at B=1 and 4-14x slower at B>=8 on this machine, so it is not used.
-- **`quantize_dynamic` is fast but breaks the model.** It also quantizes activations, with one scale per matrix.
-  Inputs to `mlp.down` have outliers up to 40,000x the median magnitude, so most values round to zero; keeping only
-  `mlp.down` in float recovers most of the quality (EN BPB 1.23 -> 1.02). The scale is shared across the batch, so
-  output quality even depends on which requests are batched together (BPB 1.21 at batch 1 vs 1.27 at batch 4).
-  This is the known activation-outlier problem of LLM quantization: [LLM.int8()](https://arxiv.org/abs/2208.07339)
-  (Dettmers et al., 2022) keeps the few outlier feature dimensions in 16-bit and the rest in int8, and
-  [SmoothQuant](https://arxiv.org/abs/2211.10438) (Xiao et al., 2023) rescales channels to move the outliers from
-  activations into the weights, which tolerate quantization better. Weight-only int8 sidesteps it by not touching
-  activations at all.
-- Quantizing `lm_head` with `quantize_dynamic` *grows* the weights: it gets its own int8 copy and the tie with
-  the fp32 embedding is lost. Our `Int8Embedding` shares the int8 table instead.
+Our weight-only int8 is almost lossless and makes the model up to 4x smaller (with the embedding table in int8
+too), but it is slower on this CPU: decoding
+is limited by memory bandwidth, and without a fused kernel each int8 weight is converted to float on every
+step. `quantize_dynamic` also quantizes activations, so activation outliers break it, the problem addressed by
+[LLM.int8()](https://arxiv.org/abs/2208.07339) and [SmoothQuant](https://arxiv.org/abs/2211.10438).
+Details: [quantization report](reports/quantization.md).
 
-## Known limitations
+## Reproduce
 
-- **Quality filters differ between languages.** English comes from FineWeb-Edu (an educational-value
-  classifier), Turkish from FineWeb2-HQ (an embedding-based quality classifier). Both are
-  "high-quality" subsets, but not filtered identically, so part of any cross-lingual effect may come
-  from differences in data quality rather than language alone.
-- **Server:** prefill runs one request at a time, so a long prompt stalls decoding for the others (chunked prefill
-  would fix this); the KV cache is slot-based, not paged.
-- `torch.ao.quantization` (used only as the `quantize_dynamic` reference) is deprecated in favour of torchao.
+Kaggle notebooks for each stage are in `notebooks/`. The analysis runs offline from the committed logs:
+
+```bash
+uv venv
+uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+uv pip install -e ".[dev,data,server]"
+.venv/bin/python -m pytest
+.venv/bin/python -m slm.eval.analysis
+```
+
+## Limitations
+
+- One model size (42.5M) and one budget (600M tokens); full list in the
+  [report](reports/research/README.md#limitations).
+- Server: prefill runs one request at a time, so a long prompt delays the others; the KV cache is slot-based,
+  not paged.
+
+## AI-assisted development
+
+This project was developed with the assistance of modern AI tools:
+
+- Code Optimization & Refactoring: Leveraged AI for improving code efficiency, debugging, and code readability.
+- Documentation: Drafted and refined project documentation and summaries with AI support.
+- Architecture & Design: All core business logic, system architecture, and final testings were fully implemented and verified by me.
+
+## License and data
+
+Code and model weights: [Apache License 2.0](LICENSE). Trained on
+[FineWeb2-HQ](https://huggingface.co/datasets/epfml/FineWeb2-HQ) and
+[FineWeb-Edu](https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu), both under the
+[ODC-By 1.0](https://opendatacommons.org/licenses/by/1-0/) license and subject to
+[Common Crawl's Terms of Use](https://commoncrawl.org/terms-of-use).
